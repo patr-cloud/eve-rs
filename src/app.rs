@@ -5,7 +5,19 @@ use crate::{
 	routeable::Routeable,
 };
 
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future, pin::Pin};
+
+fn chained_run<C: Context + Clone + Unpin, M: Middleware<C> + Clone + Unpin>(
+	i: usize,
+	nodes: Vec<MiddlewareHandler<C, M>>,
+) -> Box<dyn Fn(C) -> Pin<Box<dyn Future<Output = Result<C, hyper::Error>>>>> {
+	Box::new(move |ctx| match nodes.get(i) {
+		Some(m) => m.handler.run(ctx, chained_run(i + 1, nodes)),
+		None => {
+			Box::pin(async { Ok(ctx) })
+		}
+	})
+}
 
 pub struct App<TContext, TMiddleware>
 where
@@ -16,8 +28,8 @@ where
 }
 
 impl<
-		TContext: 'static + Context + Send + Clone,
-		TMiddleware: 'static + Middleware<TContext> + Clone + Send,
+		TContext: 'static + Context + Send + Clone + Unpin,
+		TMiddleware: 'static + Middleware<TContext> + Clone + Send + Unpin,
 	> App<TContext, TMiddleware>
 {
 	pub fn new<ContextType: Context, MiddlewareType: Middleware<ContextType>>() -> Self {
@@ -50,11 +62,20 @@ impl<
 		}
 		stack
 	}
+
+	async fn resolve(
+		&self,
+		context: TContext,
+		stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	) -> Result<TContext, hyper::Error> {
+		let chain = chained_run(0, stack);
+		chain(context).await
+	}
 }
 
 impl<
-		TContext: 'static + Context + Clone + Send,
-		TMiddleware: 'static + Middleware<TContext> + Clone + Send,
+		TContext: 'static + Context + Clone + Send + Unpin,
+		TMiddleware: 'static + Middleware<TContext> + Clone + Send + Unpin,
 	> Routeable<TContext, TMiddleware> for App<TContext, TMiddleware>
 {
 	fn use_middleware(&mut self, path: &str, middleware: TMiddleware) {
