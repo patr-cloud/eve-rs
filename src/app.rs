@@ -5,18 +5,31 @@ use crate::{
 	routeable::Routeable,
 };
 
-use std::{collections::HashMap, future::Future, pin::Pin};
+use hyper::Error;
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 
-fn chained_run<C: Context + Clone + Unpin, M: Middleware<C> + Clone + Unpin>(
+async fn chained_run<
+	C: 'static + Context + Clone + Unpin,
+	M: Middleware<C> + 'static + Clone + Unpin,
+>(
+	context: C,
+	nodes_holder: Arc<Vec<MiddlewareHandler<C, M>>>,
 	i: usize,
-	nodes: Vec<MiddlewareHandler<C, M>>,
-) -> Box<dyn Fn(C) -> Pin<Box<dyn Future<Output = Result<C, hyper::Error>>>>> {
-	Box::new(move |ctx| match nodes.get(i) {
-		Some(m) => m.handler.run(ctx, chained_run(i + 1, nodes)),
-		None => {
-			Box::pin(async { Ok(ctx) })
+) -> Result<C, Error> {
+	let nodes = nodes_holder.clone();
+	match nodes.get(i) {
+		Some(m) => {
+			m.handler
+				.run(
+					context,
+					Box::new(move |context| {
+						Box::pin(chained_run(context, nodes_holder.clone(), i + 1))
+					}),
+				)
+				.await
 		}
-	})
+		None => Ok(context),
+	}
 }
 
 pub struct App<TContext, TMiddleware>
@@ -68,8 +81,8 @@ impl<
 		context: TContext,
 		stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
 	) -> Result<TContext, hyper::Error> {
-		let chain = chained_run(0, stack);
-		chain(context).await
+		let stack = Arc::new(stack);
+		chained_run(context, stack, 0).await
 	}
 }
 
