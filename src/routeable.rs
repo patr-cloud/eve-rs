@@ -1,6 +1,10 @@
 use crate::{context::Context, middleware::Middleware};
 
-pub trait Routeable<TContext: Context, TMiddleware: Middleware<TContext>> {
+pub trait Routeable<
+	TContext: Context + Send + Sync,
+	TMiddleware: Middleware<TContext> + Send + Sync,
+>
+{
 	fn get(&mut self, path: &str, middleware: TMiddleware);
 	fn post(&mut self, path: &str, middleware: TMiddleware);
 	fn put(&mut self, path: &str, middleware: TMiddleware);

@@ -3,26 +3,30 @@ use hyper::Error;
 use regex::Regex;
 use std::{future::Future, marker::PhantomData, pin::Pin};
 
-pub type NextHandler<TContext> =
-	Box<dyn Fn(TContext) -> Pin<Box<dyn Future<Output = Result<TContext, Error>>>>>;
+pub type NextHandler<TContext> = Box<
+//	dyn Fn(TContext) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>> + Send + Sync,
+	dyn Fn(TContext) -> Result<TContext, Error>,
+>;
 
-#[async_trait]
-pub trait Middleware<TContext: Context> {
-	async fn run(&self, context: TContext, next: NextHandler<TContext>) -> Result<TContext, Error>;
+//#[async_trait]
+pub trait Middleware<TContext: Context + Send + Sync> {
+	fn run(&self, context: TContext, next: NextHandler<TContext>) -> Result<TContext, Error>;
 }
 
 #[derive(Clone)]
-pub(crate) struct MiddlewareHandler<
-	TContext: Context + Clone,
-	TMiddleware: Middleware<TContext> + Clone,
+pub struct MiddlewareHandler<
+	TContext: Context + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 > {
 	pub(crate) path_match: Regex,
 	pub(crate) handler: TMiddleware,
 	phantom_data: PhantomData<TContext>,
 }
 
-impl<TContext: Context + Clone, TMiddleware: Middleware<TContext> + Clone>
-	MiddlewareHandler<TContext, TMiddleware>
+impl<
+		TContext: Context + Clone + Send + Sync,
+		TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	> MiddlewareHandler<TContext, TMiddleware>
 {
 	pub(crate) fn new(path: String, middleware: TMiddleware) -> Self {
 		let path = path

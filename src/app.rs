@@ -8,44 +8,40 @@ use crate::{
 use hyper::Error;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 
-async fn chained_run<
-	C: 'static + Context + Clone + Unpin,
-	M: Middleware<C> + 'static + Clone + Unpin,
+fn chained_run<
+	C: 'static + Context + Clone + Send + Sync,
+	M: Middleware<C> + 'static + Clone + Send + Sync,
 >(
 	context: C,
 	nodes_holder: Arc<Vec<MiddlewareHandler<C, M>>>,
 	i: usize,
 ) -> Result<C, Error> {
 	let nodes = nodes_holder.clone();
-	match nodes.get(i) {
-		Some(m) => {
-			m.handler
-				.run(
-					context,
-					Box::new(move |context| {
-						Box::pin(chained_run(context, nodes_holder.clone(), i + 1))
-					}),
-				)
-				.await
-		}
-		None => Ok(context),
+	if let Some(m) = nodes.get(i) {
+		m.handler.run(
+			context,
+			Box::new(move |context| chained_run(context, nodes_holder.clone(), i + 1)),
+		)
+	} else {
+		Ok(context)
 	}
 }
 
 pub struct App<TContext, TMiddleware>
 where
-	TContext: Context + Clone,
-	TMiddleware: Middleware<TContext> + Clone,
+	TContext: Context + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
 	route_stack: HashMap<HttpMethod, Vec<MiddlewareHandler<TContext, TMiddleware>>>,
 }
 
 impl<
-		TContext: 'static + Context + Send + Clone + Unpin,
-		TMiddleware: 'static + Middleware<TContext> + Clone + Send + Unpin,
+		TContext: 'static + Context + Clone + Unpin + Send + Sync,
+		TMiddleware: 'static + Middleware<TContext> + Clone + Unpin + Send + Sync,
 	> App<TContext, TMiddleware>
 {
-	pub fn new<ContextType: Context, MiddlewareType: Middleware<ContextType>>() -> Self {
+	pub fn new<ContextType: Context + Send + Sync, MiddlewareType: Middleware<ContextType>>() -> Self
+	{
 		App {
 			route_stack: HashMap::new(),
 		}
@@ -76,19 +72,19 @@ impl<
 		stack
 	}
 
-	async fn resolve(
+	pub(crate) fn resolve(
 		&self,
 		context: TContext,
 		stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
 	) -> Result<TContext, hyper::Error> {
 		let stack = Arc::new(stack);
-		chained_run(context, stack, 0).await
+		chained_run(context, stack, 0)
 	}
 }
 
 impl<
-		TContext: 'static + Context + Clone + Send + Unpin,
-		TMiddleware: 'static + Middleware<TContext> + Clone + Send + Unpin,
+		TContext: 'static + Context + Clone + Unpin + Send + Sync,
+		TMiddleware: 'static + Middleware<TContext> + Clone + Unpin + Send + Sync,
 	> Routeable<TContext, TMiddleware> for App<TContext, TMiddleware>
 {
 	fn use_middleware(&mut self, path: &str, middleware: TMiddleware) {
