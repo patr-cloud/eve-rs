@@ -4,13 +4,12 @@ use regex::Regex;
 use std::{future::Future, marker::PhantomData, pin::Pin};
 
 pub type NextHandler<TContext> = Box<
-//	dyn Fn(TContext) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>> + Send + Sync,
-	dyn Fn(TContext) -> Result<TContext, Error>,
+	dyn Fn(TContext) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>> + Send + Sync,
 >;
 
-//#[async_trait]
+#[async_trait]
 pub trait Middleware<TContext: Context + Send + Sync> {
-	fn run(&self, context: TContext, next: NextHandler<TContext>) -> Result<TContext, Error>;
+	async fn run(&self, context: TContext, next: NextHandler<TContext>) -> Result<TContext, Error>;
 }
 
 #[derive(Clone)]

@@ -63,10 +63,11 @@ struct DefMdw {
 	message: String,
 }
 
+#[async_trait]
 impl Middleware<DefCtx> for DefMdw {
-	fn run(&self, mut context: DefCtx, next: NextHandler<DefCtx>) -> Result<DefCtx, Error> {
+	async fn run(&self, mut context: DefCtx, next: NextHandler<DefCtx>) -> Result<DefCtx, Error> {
 		println!("Pre: {}", self.message);
-		context = next(context)?;
+		context = next(context).await?;
 		println!("Post: {}", self.message);
 		Ok(context)
 	}
@@ -76,7 +77,7 @@ impl Middleware<DefCtx> for DefMdw {
 #[test]
 fn test_server() {
 	let app = App::<DefCtx, DefMdw>::new::<DefCtx, DefMdw>();
-	app.resolve(
+	async_std::task::block_on(app.resolve(
 		DefCtx,
 		vec![
 			MiddlewareHandler::new(
@@ -98,7 +99,7 @@ fn test_server() {
 				},
 			),
 		],
-	)
+	))
 	.unwrap();
 
 	return;
