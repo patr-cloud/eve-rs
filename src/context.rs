@@ -1,53 +1,57 @@
-use serde_json::Value;
-use std::{collections::HashMap, str};
-use crate::{middleware::MiddlewareHandler, Middleware};
+use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
+
+use std::str::{self, Utf8Error};
 
 pub trait Context {
+	fn create(request: Request) -> Self;
+	fn get_request(&self) -> &Request;
+	fn get_request_mut(&mut self) -> &mut Request;
+	fn get_response(&self) -> &Response;
+	fn get_response_mut(&mut self) -> &mut Response;
 
-	// Stuff for request
-	fn get_raw_body(&self) -> &[u8];
-	fn get_body_string(&self) -> Result<&str, str::Utf8Error> {
-		str::from_utf8(self.get_raw_body())
+	fn get_body(&self) -> Result<&str, Utf8Error> {
+		self.get_request().get_body()
 	}
-	fn get_body_object(&self) -> Result<Value, serde_json::Error> {
-		serde_json::from_slice(self.get_raw_body())
+	fn body(&mut self, string: &str) -> &mut Self {
+		self.get_response_mut().set_body(string);
+		self
 	}
-	fn get_cookies(&self) -> Vec<Cookie>;
-	fn get_host(&self) -> &str;
-	fn get_ip(&self) -> &str;
-	fn get_ips(&self) -> Vec<&str>;
-	fn get_method(&self) -> &str;
-	fn get_path(&self) -> &str;
-	fn get_params(&self) -> HashMap<String, String>;
-	fn get_protocol(&self) -> &str;
-	fn get_query(&self) -> HashMap<String, Value>;
-	fn is_secure(&self) -> bool {
-		self.get_protocol() == "https"
+	fn body_bytes(&mut self, string: &[u8]) -> &mut Self {
+		self.get_response_mut().set_body_bytes(string);
+		self
 	}
-	fn get(&self, header: &str) -> Option<&str>;
-}
 
-pub struct Cookie {
-	pub key: String,
-	pub value: String,
-	pub options: CookieOptions,
-}
+	fn get_method(&self) -> &HttpMethod {
+		self.get_request().get_method()
+	}
 
-pub struct CookieOptions {
-	pub domain: String,
-	pub path: String,
-	pub expires: u64,
-	pub http_only: bool,
-	pub max_age: u64,
-	pub secure: bool,
-	pub signed: bool,
-	pub same_site: Option<SameSite>,
-}
+	fn status(&mut self, code: u16) -> &mut Self {
+		self.get_response_mut().set_status(code);
+		self
+	}
 
-#[derive(PartialEq)]
-pub enum SameSite {
-	Strict,
-	Lax,
-}
+	fn content_type(&mut self, c_type: &str) -> &mut Self {
+		self.header("Content-Type", c_type)
+	}
 
-pub struct DefaultContext {}
+	fn redirect(&mut self, destination: &str) -> &mut Self {
+		self.status(302).header("Location", destination)
+	}
+
+	fn get_path(&self) -> &str {
+		self.get_request().get_path()
+	}
+
+	fn get_header(&self, key: &str) -> Option<&Vec<String>> {
+		self.get_request().get_headers().get(key)
+	}
+	fn header(&mut self, key: &str, value: &str) -> &mut Self {
+		self.get_response_mut()
+			.set_header(key.to_owned(), value.to_owned());
+		self
+	}
+
+	fn cookie(&mut self, cookie: &Cookie) -> &mut Self {
+		self.header("Set-Cookie", &cookie.to_header_string())
+	}
+}

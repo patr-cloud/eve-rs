@@ -13,19 +13,20 @@ pub trait Middleware<TContext: Context + Send + Sync> {
 }
 
 #[derive(Clone)]
-pub struct MiddlewareHandler<
+pub(crate) struct MiddlewareHandler<TContext, TMiddleware>
+where
 	TContext: Context + Clone + Send + Sync,
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
-> {
+{
 	pub(crate) path_match: Regex,
 	pub(crate) handler: TMiddleware,
 	phantom_data: PhantomData<TContext>,
 }
 
-impl<
-		TContext: Context + Clone + Send + Sync,
-		TMiddleware: Middleware<TContext> + Clone + Send + Sync,
-	> MiddlewareHandler<TContext, TMiddleware>
+impl<TContext, TMiddleware> MiddlewareHandler<TContext, TMiddleware>
+where
+	TContext: Context + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
 	pub(crate) fn new(path: String, middleware: TMiddleware) -> Self {
 		let path = path

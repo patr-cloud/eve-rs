@@ -5,21 +5,27 @@ use crate::{
 	routeable::Routeable,
 };
 
-use hyper::Error;
 use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
 
-fn chained_run<C: 'static + Context + Clone + Send + Sync, M: 'static + Middleware<C> + Clone + Send + Sync>(
-	context: C,
-	nodes_holder: Arc<Vec<MiddlewareHandler<C, M>>>,
+use hyper::Error;
+
+fn chained_run<TContext, TMiddleware>(
+	context: TContext,
+	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware>>>,
 	i: usize,
-) -> Pin<Box<dyn Future<Output = Result<C, Error>> + Send>> {
+) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>>
+where
+	TContext: 'static + Context + Clone + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+{
 	Box::pin(async move {
-		let nodes = nodes_holder.clone();
-		if let Some(m) = nodes.get(i) {
-			m.handler.run(
-				context,
-				Box::new(move |context| chained_run(context, nodes_holder.clone(), i + 1)),
-			).await
+		if let Some(m) = nodes.clone().get(i) {
+			m.handler
+				.run(
+					context,
+					Box::new(move |context| chained_run(context, nodes.clone(), i + 1)),
+				)
+				.await
 		} else {
 			Ok(context)
 		}
@@ -28,19 +34,18 @@ fn chained_run<C: 'static + Context + Clone + Send + Sync, M: 'static + Middlewa
 
 pub struct App<TContext, TMiddleware>
 where
-	TContext: Context + Clone + Send + Sync,
-	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TContext: 'static + Context + Clone + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
 	route_stack: HashMap<HttpMethod, Vec<MiddlewareHandler<TContext, TMiddleware>>>,
 }
 
-impl<
-		TContext: 'static + Context + Clone + Unpin + Send + Sync,
-		TMiddleware: 'static + Middleware<TContext> + Clone + Unpin + Send + Sync,
-	> App<TContext, TMiddleware>
+impl<TContext, TMiddleware> App<TContext, TMiddleware>
+where
+	TContext: 'static + Context + Clone + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
-	pub fn new<ContextType: Context + Send + Sync, MiddlewareType: Middleware<ContextType>>() -> Self
-	{
+	pub fn new() -> Self {
 		App {
 			route_stack: HashMap::new(),
 		}
@@ -71,20 +76,16 @@ impl<
 		stack
 	}
 
-	pub(crate) async fn resolve(
-		&self,
-		context: TContext,
-		stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
-	) -> Result<TContext, hyper::Error> {
-		let stack = Arc::new(stack);
-		chained_run(context, stack, 0).await
+	pub async fn resolve(&self, context: TContext) -> Result<TContext, hyper::Error> {
+		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
+		chained_run(context, Arc::new(stack), 0).await
 	}
 }
 
-impl<
-		TContext: 'static + Context + Clone + Unpin + Send + Sync,
-		TMiddleware: 'static + Middleware<TContext> + Clone + Unpin + Send + Sync,
-	> Routeable<TContext, TMiddleware> for App<TContext, TMiddleware>
+impl<TContext, TMiddleware> Routeable<TContext, TMiddleware> for App<TContext, TMiddleware>
+where
+	TContext: 'static + Context + Clone + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
 	fn use_middleware(&mut self, path: &str, middleware: TMiddleware) {
 		for method in &[
