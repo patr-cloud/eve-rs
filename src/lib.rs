@@ -26,11 +26,10 @@ pub use response::Response;
 pub use routeable::Routeable;
 
 use hyper::{
-	body,
 	service::{make_service_fn, service_fn},
-	Body, Error, Response as HyperResponse, Server, Version,
+	Body, Error, Response as HyperResponse, Server,
 };
-use std::{collections::HashMap, convert::Infallible, net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
 pub async fn listen<TContext, TMiddleware>(
 	app: App<TContext, TMiddleware>,
@@ -40,6 +39,7 @@ pub async fn listen<TContext, TMiddleware>(
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
 	let bind_addr = SocketAddr::from(bind_addr);
+
 	let app_arc = Arc::new(app);
 
 	async move {
@@ -47,84 +47,22 @@ pub async fn listen<TContext, TMiddleware>(
 			let app = app_arc.clone();
 
 			async {
-				Ok::<_, Infallible>(service_fn(|req: hyper::Request<Body>| async {
-					let (parts, body) = req.into_parts();
-					let mut headers = HashMap::<String, Vec<String>>::new();
-					parts.headers.iter().for_each(|(key, value)| {
-						let key = key.to_string();
-						let value = value.to_str();
+				Ok::<_, Infallible>(service_fn(move |req: hyper::Request<Body>| {
+					let app = app.clone();
+					async move {
+						let request = Request::from_hyper(req).await;
+						let context = TContext::create(request);
 
-						if value.is_err() {
-							return;
-						}
-						let value = value.unwrap().to_string();
+						// execute app's middlewares
+						let _response = app.resolve(context).await;
 
-						if let Some(values) = headers.get_mut(&key) {
-							values.push(value);
-						} else {
-							headers.insert(key.to_string(), vec![value]);
-						}
-					});
-					let request = Request {
-						body: body::to_bytes(body).await.unwrap().to_vec(),
-						method: HttpMethod::from(parts.method),
-						path: parts.uri.path().to_string(),
-						version: match parts.version {
-							Version::HTTP_09 => (0, 9),
-							Version::HTTP_10 => (1, 0),
-							Version::HTTP_11 => (1, 1),
-							Version::HTTP_2 => (2, 0),
-							Version::HTTP_3 => (3, 0),
-							_ => (0, 0),
-						},
-						headers: headers.clone(),
-						query: if let Some(query) = parts.uri.query() {
-							query
-								.split('&')
-								.filter_map(|kv| {
-									if kv.contains('=') {
-										None
-									} else {
-										let mut items = kv
-											.split('=')
-											.map(String::from)
-											.collect::<Vec<String>>();
-										if items.len() != 2 {
-											None
-										} else {
-											Some((items.remove(0), items.remove(1)))
-										}
-									}
-								})
-								.collect::<HashMap<String, String>>()
-						} else {
-							HashMap::new()
-						},
-						params: HashMap::new(),
-						cookies: {
-							let cookies_headers = headers.remove("Cookie");
-							if let Some(header) = cookies_headers {
-								let mut cookies = vec![];
-								header.into_iter().for_each(|header| {
-									// TODO
-								});
-								cookies
-							} else {
-								vec![]
-							}
-						},
-					};
-
-					// TODO execute app's middlewares
-
-					let response = HyperResponse::new(Body::default());
-					Ok::<HyperResponse<Body>, Infallible>(response)
+						Ok::<_, Infallible>(HyperResponse::new(Body::default()))
+					}
 				}))
 			}
 		});
 
-		let server = Server::bind(&bind_addr).serve(service);
-		server.await.unwrap();
+		Server::bind(&bind_addr).serve(service).await.unwrap();
 	}
 	.await
 }

@@ -1,4 +1,5 @@
-use crate::{cookie::Cookie, HttpMethod};
+use crate::{cookie::Cookie, CookieOptions, HttpMethod, SameSite};
+use hyper::{body, Body, Request as HyperRequest, Version};
 use serde::Deserialize;
 use serde_json::Error;
 use std::{
@@ -19,6 +20,134 @@ pub struct Request {
 }
 
 impl Request {
+	pub async fn from_hyper(req: HyperRequest<Body>) -> Self {
+		let (parts, body) = req.into_parts();
+		let mut headers = HashMap::<String, Vec<String>>::new();
+		parts.headers.iter().for_each(|(key, value)| {
+			let key = key.to_string();
+			let value = value.to_str();
+
+			if value.is_err() {
+				return;
+			}
+			let value = value.unwrap().to_string();
+
+			if let Some(values) = headers.get_mut(&key) {
+				values.push(value);
+			} else {
+				headers.insert(key.to_string(), vec![value]);
+			}
+		});
+		Request {
+			body: body::to_bytes(body).await.unwrap().to_vec(),
+			method: HttpMethod::from(parts.method),
+			path: parts.uri.path().to_string(),
+			version: match parts.version {
+				Version::HTTP_09 => (0, 9),
+				Version::HTTP_10 => (1, 0),
+				Version::HTTP_11 => (1, 1),
+				Version::HTTP_2 => (2, 0),
+				Version::HTTP_3 => (3, 0),
+				_ => (0, 0),
+			},
+			headers: headers.clone(),
+			query: if let Some(query) = parts.uri.query() {
+				query
+					.split('&')
+					.filter_map(|kv| {
+						if kv.contains('=') {
+							None
+						} else {
+							let mut items =
+								kv.split('=').map(String::from).collect::<Vec<String>>();
+							if items.len() != 2 {
+								None
+							} else {
+								Some((items.remove(0), items.remove(1)))
+							}
+						}
+					})
+					.collect::<HashMap<String, String>>()
+			} else {
+				HashMap::new()
+			},
+			params: HashMap::new(),
+			cookies: {
+				let cookies_headers = headers.remove("Cookie");
+				if let Some(header) = cookies_headers {
+					header
+						.into_iter()
+						.map(|header| {
+							let mut options = CookieOptions::default();
+
+							let mut pieces = header.split(';');
+
+							let mut key_pair = pieces.next().unwrap().split('=');
+
+							let key = key_pair.next().unwrap_or("").to_owned();
+							let value = key_pair.next().unwrap_or("").to_owned();
+
+							for option in pieces {
+								let mut option_key_pair = option.split('=');
+
+								if let Some(option_key) = option_key_pair.next() {
+									match option_key.to_lowercase().trim() {
+										"expires" => {
+											options.expires = option_key_pair
+												.next()
+												.unwrap_or("0")
+												.parse::<u64>()
+												.unwrap_or(0)
+										}
+										"max-age" => {
+											options.max_age = option_key_pair
+												.next()
+												.unwrap_or("0")
+												.parse::<u64>()
+												.unwrap_or(0)
+										}
+										"domain" => {
+											options.domain =
+												option_key_pair.next().unwrap_or("").to_owned()
+										}
+										"path" => {
+											options.path =
+												option_key_pair.next().unwrap_or("").to_owned()
+										}
+										"secure" => options.secure = true,
+										"httponly" => options.http_only = true,
+										"samesite" => {
+											if let Some(same_site_value) = option_key_pair.next() {
+												match same_site_value.to_lowercase().as_ref() {
+													"strict" => {
+														options.same_site = Some(SameSite::Strict)
+													}
+													"lax" => {
+														options.same_site = Some(SameSite::Lax)
+													}
+													_ => (),
+												};
+											}
+										}
+										_ => (),
+									};
+								}
+							}
+
+							Cookie {
+								key,
+								value,
+								options,
+							}
+						})
+						.collect::<Vec<Cookie>>()
+				} else {
+					vec![]
+				}
+			},
+		}
+	}
+
 	pub fn get_body_bytes(&self) -> &[u8] {
 		&self.body
 	}
@@ -42,9 +171,8 @@ impl Request {
 		&self.path
 	}
 
-	pub fn get_version(&self) -> &str {
-		todo!()
-		//&format!("{}.{}", self.version.0, self.version.1)
+	pub fn get_version(&self) -> String {
+		format!("{}.{}", self.version.0, self.version.1)
 	}
 
 	pub fn get_version_major(&self) -> u8 {

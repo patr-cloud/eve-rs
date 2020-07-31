@@ -43,6 +43,7 @@ impl Cookie {
 	}
 }
 
+#[derive(Default)]
 pub struct CookieOptions {
 	pub domain: String,
 	pub path: String,
