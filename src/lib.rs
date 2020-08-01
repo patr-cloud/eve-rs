@@ -123,11 +123,11 @@ impl Middleware<DefCtx> for DefMdw {
 }
 
 /// Test code
-#[async_std::test]
-async fn test_server() {
+#[test]
+fn test_server() {
 	let mut app = App::<DefCtx, DefMdw>::new();
 	app.get(
-		"/app/:applicationId.:version/changelog",
+		"/",
 		&[
 			DefMdw {
 				message: "Test 1".to_owned(),
@@ -140,44 +140,7 @@ async fn test_server() {
 			},
 		],
 	);
-	app.resolve(DefCtx {
-		request: Request {
-			body: vec![],
-			method: HttpMethod::Get,
-			path: String::from("/"),
-			version: (1, 1),
-			headers: Default::default(),
-			query: Default::default(),
-			params: Default::default(),
-			cookies: Default::default(),
-		},
-		response: Response::new(),
-	})
-	.await
-	.unwrap();
-
-	return;
-	let original_path = "/app/:applicationId.:version/changelog";
-
-	let path = regex::Regex::new(":(?P<var>([a-zA-Z0-9_]+))")
-		.unwrap()
-		.replace_all(original_path, "(?P<$var>([a-zA-Z0-9_\\.-]+))");
-
-	println!("{}", path);
-	let request_url = "/app/kai.control.center.12345/changelog";
-	let re = regex::Regex::new(&path).unwrap();
-	let captures = re.captures(request_url).unwrap();
-	for name in re.capture_names() {
-		if name.is_none() {
-			continue;
-		}
-		println!("{:#?}", name.unwrap());
-	}
-	for var in captures.iter() {
-		println!("{:#?}", var);
-	}
-
-	//start_server(3000).await;
+	tokio::runtime::Runtime::new().unwrap().block_on(async {
+		listen(app, ([127, 0, 0, 1], 3000)).await;
+	});
 }
-
-// /app/(?P<applicationId>([a-zA-Z0-9_-]+))-(?P<version>([a-zA-Z0-9_-]+))/changelog
