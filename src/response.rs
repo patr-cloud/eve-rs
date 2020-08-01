@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+#[derive(Clone)]
 pub struct Response {
 	pub(crate) response: Vec<u8>,
 	pub(crate) status: u16,

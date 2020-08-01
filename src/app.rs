@@ -2,10 +2,9 @@ use crate::{
 	context::Context,
 	http_method::HttpMethod,
 	middleware::{Middleware, MiddlewareHandler},
-	routeable::Routeable,
 };
 
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
+use std::{future::Future, pin::Pin, sync::Arc};
 
 use hyper::Error;
 
@@ -37,7 +36,15 @@ where
 	TContext: 'static + Context + Clone + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
-	route_stack: HashMap<HttpMethod, Vec<MiddlewareHandler<TContext, TMiddleware>>>,
+	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	post_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	put_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	delete_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	head_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	options_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	connect_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	patch_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	trace_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
 }
 
 impl<TContext, TMiddleware> App<TContext, TMiddleware>
@@ -47,19 +54,221 @@ where
 {
 	pub fn new() -> Self {
 		App {
-			route_stack: HashMap::new(),
+			get_stack: vec![],
+			post_stack: vec![],
+			put_stack: vec![],
+			delete_stack: vec![],
+			head_stack: vec![],
+			options_stack: vec![],
+			connect_stack: vec![],
+			patch_stack: vec![],
+			trace_stack: vec![],
 		}
 	}
 
-	fn add_to_stack(&mut self, method: &HttpMethod, path: &str, middleware: TMiddleware) {
-		if let Some(stack) = self.route_stack.get_mut(&method) {
-			stack.push(MiddlewareHandler::new(path.to_string(), middleware));
-		} else {
-			self.route_stack.insert(
-				method.clone(),
-				vec![MiddlewareHandler::new(path.to_string(), middleware)],
-			);
+	pub fn get(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.get_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn post(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.post_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn put(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.put_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn delete(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.delete_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn head(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.head_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn options(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.options_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn connect(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.connect_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn patch(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.patch_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn trace(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.trace_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn use_middleware(&mut self, path: &str, middlewares: &[TMiddleware]) {
+		middlewares.into_iter().for_each(|handler| {
+			self.get_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+			self.post_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+			self.put_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+			self.delete_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+			self.head_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+			self.options_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+			self.connect_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+			self.patch_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+			self.trace_stack
+				.push(self.create_middleware_handler(path, handler.clone(), true));
+		});
+	}
+
+	pub fn use_sub_app(&mut self, base_path: &str, sub_app: App<TContext, TMiddleware>) {
+		let base_path = {
+			if base_path == "/" {
+				base_path.to_string()
+			} else {
+				let mut formatted_base_path = String::new();
+
+				// If it ends with /, remove it
+				if base_path.ends_with('/') {
+					formatted_base_path = base_path[..(base_path.len() - 1)].to_string();
+				}
+
+				// If it doesn't begin with a /, add it
+				if !base_path.starts_with('/') {
+					formatted_base_path = format!("/{}", base_path);
+				}
+
+				formatted_base_path
+			}
+		};
+
+		// TODO handle regex for base_path as well
+		// Current proposal: Have a regexify_url function to handle all regex
+		// This is required for situations like these:
+		// app.use_sub_app("/:appId/changelog", changelog_handler);
+		// or
+		// app.use_sub_app("/*/application", application_handler);
+
+		let App {
+			get_stack,
+			post_stack,
+			put_stack,
+			delete_stack,
+			head_stack,
+			options_stack,
+			connect_stack,
+			patch_stack,
+			trace_stack,
+		} = sub_app;
+
+		for handler in get_stack {
+			self.get_stack.push(self.create_middleware_handler(
+				&format!("{}{}", base_path, handler.path_match.as_str()),
+				handler.handler,
+				false, // Don't push a $ to the regex. sub_app would've handled that
+			));
 		}
+		for handler in post_stack {
+			self.get_stack.push(self.create_middleware_handler(
+				&format!("{}{}", base_path, handler.path_match.as_str()),
+				handler.handler,
+				false, // Don't push a $ to the regex. sub_app would've handled that
+			));
+		}
+		for handler in put_stack {
+			self.get_stack.push(self.create_middleware_handler(
+				&format!("{}{}", base_path, handler.path_match.as_str()),
+				handler.handler,
+				false, // Don't push a $ to the regex. sub_app would've handled that
+			));
+		}
+		for handler in delete_stack {
+			self.get_stack.push(self.create_middleware_handler(
+				&format!("{}{}", base_path, handler.path_match.as_str()),
+				handler.handler,
+				false, // Don't push a $ to the regex. sub_app would've handled that
+			));
+		}
+		for handler in head_stack {
+			self.get_stack.push(self.create_middleware_handler(
+				&format!("{}{}", base_path, handler.path_match.as_str()),
+				handler.handler,
+				false, // Don't push a $ to the regex. sub_app would've handled that
+			));
+		}
+		for handler in options_stack {
+			self.get_stack.push(self.create_middleware_handler(
+				&format!("{}{}", base_path, handler.path_match.as_str()),
+				handler.handler,
+				false, // Don't push a $ to the regex. sub_app would've handled that
+			));
+		}
+		for handler in connect_stack {
+			self.get_stack.push(self.create_middleware_handler(
+				&format!("{}{}", base_path, handler.path_match.as_str()),
+				handler.handler,
+				false, // Don't push a $ to the regex. sub_app would've handled that
+			));
+		}
+		for handler in patch_stack {
+			self.get_stack.push(self.create_middleware_handler(
+				&format!("{}{}", base_path, handler.path_match.as_str()),
+				handler.handler,
+				false, // Don't push a $ to the regex. sub_app would've handled that
+			));
+		}
+		for handler in trace_stack {
+			self.get_stack.push(self.create_middleware_handler(
+				&format!("{}{}", base_path, handler.path_match.as_str()),
+				handler.handler,
+				false, // Don't push a $ to the regex. sub_app would've handled that
+			));
+		}
+	}
+
+	pub async fn resolve(&self, context: TContext) -> Result<TContext, hyper::Error> {
+		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
+		chained_run(context, Arc::new(stack), 0).await
+	}
+
+	fn create_middleware_handler(
+		&self,
+		path: &str,
+		handler: TMiddleware,
+		is_endpoint: bool,
+	) -> MiddlewareHandler<TContext, TMiddleware> {
+		MiddlewareHandler::new(path, handler, is_endpoint)
 	}
 
 	fn get_middleware_stack(
@@ -68,67 +277,23 @@ where
 		path: &str,
 	) -> Vec<MiddlewareHandler<TContext, TMiddleware>> {
 		let mut stack = vec![];
-		for handler in self.route_stack.get(method).unwrap_or(&Vec::default()) {
+		let route_stack = match method {
+			HttpMethod::Get => &self.get_stack,
+			HttpMethod::Post => &self.post_stack,
+			HttpMethod::Put => &self.put_stack,
+			HttpMethod::Delete => &self.delete_stack,
+			HttpMethod::Head => &self.head_stack,
+			HttpMethod::Options => &self.options_stack,
+			HttpMethod::Connect => &self.connect_stack,
+			HttpMethod::Patch => &self.patch_stack,
+			HttpMethod::Trace => &self.trace_stack,
+			_ => unreachable!("Getting a middleware stack for use? What?"),
+		};
+		for handler in route_stack {
 			if handler.is_match(path) {
 				stack.push(handler.clone());
 			}
 		}
 		stack
-	}
-
-	pub async fn resolve(&self, context: TContext) -> Result<TContext, hyper::Error> {
-		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
-		chained_run(context, Arc::new(stack), 0).await
-	}
-}
-
-impl<TContext, TMiddleware> Routeable<TContext, TMiddleware> for App<TContext, TMiddleware>
-where
-	TContext: 'static + Context + Clone + Send + Sync,
-	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
-{
-	fn use_middleware(&mut self, path: &str, middleware: TMiddleware) {
-		for method in &[
-			HttpMethod::Get,
-			HttpMethod::Post,
-			HttpMethod::Put,
-			HttpMethod::Delete,
-			HttpMethod::Head,
-			HttpMethod::Options,
-			HttpMethod::Connect,
-			HttpMethod::Patch,
-			HttpMethod::Trace,
-			HttpMethod::Use,
-		] {
-			self.add_to_stack(method, path, middleware.clone());
-		}
-	}
-
-	fn get(&mut self, path: &str, middleware: TMiddleware) {
-		self.add_to_stack(&HttpMethod::Get, path, middleware);
-	}
-	fn post(&mut self, path: &str, middleware: TMiddleware) {
-		self.add_to_stack(&HttpMethod::Post, path, middleware);
-	}
-	fn put(&mut self, path: &str, middleware: TMiddleware) {
-		self.add_to_stack(&HttpMethod::Put, path, middleware);
-	}
-	fn delete(&mut self, path: &str, middleware: TMiddleware) {
-		self.add_to_stack(&HttpMethod::Delete, path, middleware);
-	}
-	fn head(&mut self, path: &str, middleware: TMiddleware) {
-		self.add_to_stack(&HttpMethod::Head, path, middleware);
-	}
-	fn options(&mut self, path: &str, middleware: TMiddleware) {
-		self.add_to_stack(&HttpMethod::Options, path, middleware);
-	}
-	fn connect(&mut self, path: &str, middleware: TMiddleware) {
-		self.add_to_stack(&HttpMethod::Connect, path, middleware);
-	}
-	fn patch(&mut self, path: &str, middleware: TMiddleware) {
-		self.add_to_stack(&HttpMethod::Patch, path, middleware);
-	}
-	fn trace(&mut self, path: &str, middleware: TMiddleware) {
-		self.add_to_stack(&HttpMethod::Trace, path, middleware);
 	}
 }

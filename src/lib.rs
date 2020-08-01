@@ -14,7 +14,6 @@ mod http_method;
 mod middleware;
 mod request;
 mod response;
-mod routeable;
 
 pub use app::App;
 pub use context::Context;
@@ -23,13 +22,12 @@ pub use http_method::HttpMethod;
 pub use middleware::{Middleware, NextHandler};
 pub use request::Request;
 pub use response::Response;
-pub use routeable::Routeable;
 
 use hyper::{
 	service::{make_service_fn, service_fn},
 	Body, Error, Response as HyperResponse, Server,
 };
-use std::{convert::Infallible, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 pub async fn listen<TContext, TMiddleware>(
 	app: App<TContext, TMiddleware>,
@@ -47,16 +45,31 @@ pub async fn listen<TContext, TMiddleware>(
 			let app = app_arc.clone();
 
 			async {
-				Ok::<_, Infallible>(service_fn(move |req: hyper::Request<Body>| {
+				Ok::<_, Error>(service_fn(move |req: hyper::Request<Body>| {
 					let app = app.clone();
 					async move {
 						let request = Request::from_hyper(req).await;
 						let context = TContext::create(request);
 
 						// execute app's middlewares
-						let _response = app.resolve(context).await;
+						let context = app.resolve(context).await?;
+						let response = context.get_response();
 
-						Ok::<_, Infallible>(HyperResponse::new(Body::default()))
+						let mut hyper_response = HyperResponse::builder();
+
+						// Set the appropriate headers
+						for (key, values) in &response.headers {
+							for value in values {
+								hyper_response = hyper_response.header(key, value);
+							}
+						}
+
+						Ok::<_, Error>(
+							hyper_response
+								.status(response.status)
+								.body(Body::from(response.response.clone()))
+								.unwrap(),
+						)
 					}
 				}))
 			}
@@ -68,23 +81,29 @@ pub async fn listen<TContext, TMiddleware>(
 }
 
 #[derive(Clone)]
-struct DefCtx;
+struct DefCtx {
+	request: Request,
+	response: Response,
+}
 
 impl Context for DefCtx {
-	fn create(_request: request::Request) -> Self {
-		todo!()
+	fn create(request: request::Request) -> Self {
+		DefCtx {
+			request,
+			response: Response::new(),
+		}
 	}
 	fn get_request(&self) -> &request::Request {
-		todo!()
+		&self.request
 	}
 	fn get_request_mut(&mut self) -> &mut request::Request {
-		todo!()
+		&mut self.request
 	}
 	fn get_response(&self) -> &response::Response {
-		todo!()
+		&self.response
 	}
 	fn get_response_mut(&mut self) -> &mut response::Response {
-		todo!()
+		&mut self.response
 	}
 }
 
@@ -104,36 +123,41 @@ impl Middleware<DefCtx> for DefMdw {
 }
 
 /// Test code
-#[test]
-fn test_server() {
-	let app = App::<DefCtx, DefMdw>::new();
-	async_std::task::block_on(app.resolve(
-		DefCtx,
-		// vec![
-		// 	MiddlewareHandler::new(
-		// 		"/".to_owned(),
-		// 		DefMdw {
-		// 			message: "Test 1".to_owned(),
-		// 		},
-		// 	),
-		// 	MiddlewareHandler::new(
-		// 		"/".to_owned(),
-		// 		DefMdw {
-		// 			message: "Test 2".to_owned(),
-		// 		},
-		// 	),
-		// 	MiddlewareHandler::new(
-		// 		"/".to_owned(),
-		// 		DefMdw {
-		// 			message: "Test 3".to_owned(),
-		// 		},
-		// 	),
-		// ],
-	))
+#[async_std::test]
+async fn test_server() {
+	let mut app = App::<DefCtx, DefMdw>::new();
+	app.get(
+		"/app/:applicationId.:version/changelog",
+		&[
+			DefMdw {
+				message: "Test 1".to_owned(),
+			},
+			DefMdw {
+				message: "Test 2".to_owned(),
+			},
+			DefMdw {
+				message: "Test 3".to_owned(),
+			},
+		],
+	);
+	app.resolve(DefCtx {
+		request: Request {
+			body: vec![],
+			method: HttpMethod::Get,
+			path: String::from("/"),
+			version: (1, 1),
+			headers: Default::default(),
+			query: Default::default(),
+			params: Default::default(),
+			cookies: Default::default(),
+		},
+		response: Response::new(),
+	})
+	.await
 	.unwrap();
 
 	return;
-	let original_path = "/app/:applicationId\\.:version/changelog";
+	let original_path = "/app/:applicationId.:version/changelog";
 
 	let path = regex::Regex::new(":(?P<var>([a-zA-Z0-9_]+))")
 		.unwrap()

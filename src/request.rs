@@ -8,6 +8,7 @@ use std::{
 	str::{self, Utf8Error},
 };
 
+#[derive(Clone)]
 pub struct Request {
 	pub(crate) body: Vec<u8>,
 	pub(crate) method: HttpMethod,
