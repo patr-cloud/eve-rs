@@ -9,7 +9,7 @@ use std::{future::Future, pin::Pin, sync::Arc};
 use hyper::Error;
 
 fn chained_run<TContext, TMiddleware>(
-	context: TContext,
+	mut context: TContext,
 	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware>>>,
 	i: usize,
 ) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>>
@@ -26,6 +26,11 @@ where
 				)
 				.await
 		} else {
+			let method = context.get_method().to_string();
+			let path = context.get_path().to_string();
+			context
+				.status(404)
+				.body(&format!("Cannot {} route {}", method, path));
 			Ok(context)
 		}
 	})
