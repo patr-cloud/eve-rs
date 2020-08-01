@@ -1,7 +1,7 @@
 use hyper::Method;
 use std::fmt::{Display, Formatter, Result};
 
-#[derive(Eq, PartialEq, Hash, Clone)]
+#[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub enum HttpMethod {
 	Get,
 	Post,

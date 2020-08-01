@@ -1,7 +1,6 @@
 use crate::{
-	context::Context,
-	http_method::HttpMethod,
-	middleware::{Middleware, MiddlewareHandler},
+	context::Context, http_method::HttpMethod, middleware::Middleware,
+	middleware_handler::MiddlewareHandler,
 };
 
 use std::{future::Future, pin::Pin, sync::Arc};

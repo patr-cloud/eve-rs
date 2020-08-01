@@ -4,11 +4,11 @@ use serde::Deserialize;
 use serde_json::Error;
 use std::{
 	collections::HashMap,
-	fmt::{Debug, Formatter},
+	fmt::Debug,
 	str::{self, Utf8Error},
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Request {
 	pub(crate) body: Vec<u8>,
 	pub(crate) method: HttpMethod,
@@ -56,16 +56,21 @@ impl Request {
 				query
 					.split('&')
 					.filter_map(|kv| {
-						if kv.contains('=') {
+						if !kv.contains('=') {
 							None
 						} else {
-							let mut items =
-								kv.split('=').map(String::from).collect::<Vec<String>>();
-							if items.len() != 2 {
-								None
+							let mut items = kv.split('=').map(String::from);
+							let key = if let Some(key) = items.next() {
+								key
 							} else {
-								Some((items.remove(0), items.remove(1)))
-							}
+								return None;
+							};
+							let value = if let Some(value) = items.next() {
+								value
+							} else {
+								return None;
+							};
+							Some((key, value))
 						}
 					})
 					.collect::<HashMap<String, String>>()
@@ -73,78 +78,73 @@ impl Request {
 				HashMap::new()
 			},
 			params: HashMap::new(),
-			cookies: {
-				let cookies_headers = headers.remove("Cookie");
-				if let Some(header) = cookies_headers {
-					header
-						.into_iter()
-						.map(|header| {
-							let mut options = CookieOptions::default();
+			cookies: if let Some(header) = headers.remove("Cookie") {
+				header
+					.into_iter()
+					.map(|header| {
+						let mut options = CookieOptions::default();
 
-							let mut pieces = header.split(';');
+						let mut pieces = header.split(';');
 
-							let mut key_pair = pieces.next().unwrap().split('=');
+						let mut key_pair = pieces.next().unwrap().split('=');
 
-							let key = key_pair.next().unwrap_or("").to_owned();
-							let value = key_pair.next().unwrap_or("").to_owned();
+						let key = key_pair.next().unwrap_or("").to_owned();
+						let value = key_pair.next().unwrap_or("").to_owned();
 
-							for option in pieces {
-								let mut option_key_pair = option.split('=');
+						for option in pieces {
+							let mut option_key_pair = option.split('=');
 
-								if let Some(option_key) = option_key_pair.next() {
-									match option_key.to_lowercase().trim() {
-										"expires" => {
-											options.expires = option_key_pair
-												.next()
-												.unwrap_or("0")
-												.parse::<u64>()
-												.unwrap_or(0)
+							if let Some(option_key) = option_key_pair.next() {
+								match option_key.to_lowercase().trim() {
+									"expires" => {
+										options.expires = option_key_pair
+											.next()
+											.unwrap_or("0")
+											.parse::<u64>()
+											.unwrap_or(0)
+									}
+									"max-age" => {
+										options.max_age = option_key_pair
+											.next()
+											.unwrap_or("0")
+											.parse::<u64>()
+											.unwrap_or(0)
+									}
+									"domain" => {
+										options.domain =
+											option_key_pair.next().unwrap_or("").to_owned()
+									}
+									"path" => {
+										options.path =
+											option_key_pair.next().unwrap_or("").to_owned()
+									}
+									"secure" => options.secure = true,
+									"httponly" => options.http_only = true,
+									"samesite" => {
+										if let Some(same_site_value) = option_key_pair.next() {
+											match same_site_value.to_lowercase().as_ref() {
+												"strict" => {
+													options.same_site = Some(SameSite::Strict)
+												}
+												"lax" => options.same_site = Some(SameSite::Lax),
+												_ => (),
+											};
 										}
-										"max-age" => {
-											options.max_age = option_key_pair
-												.next()
-												.unwrap_or("0")
-												.parse::<u64>()
-												.unwrap_or(0)
-										}
-										"domain" => {
-											options.domain =
-												option_key_pair.next().unwrap_or("").to_owned()
-										}
-										"path" => {
-											options.path =
-												option_key_pair.next().unwrap_or("").to_owned()
-										}
-										"secure" => options.secure = true,
-										"httponly" => options.http_only = true,
-										"samesite" => {
-											if let Some(same_site_value) = option_key_pair.next() {
-												match same_site_value.to_lowercase().as_ref() {
-													"strict" => {
-														options.same_site = Some(SameSite::Strict)
-													}
-													"lax" => {
-														options.same_site = Some(SameSite::Lax)
-													}
-													_ => (),
-												};
-											}
-										}
-										_ => (),
-									};
-								}
+									}
+									_ => (),
+								};
 							}
+						}
 
-							Cookie {
-								key,
-								value,
-								options,
-							}
-						})
-						.collect::<Vec<Cookie>>()
-				} else {
-					vec![]
-				}
+						Cookie {
+							key,
+							value,
+							options,
+						}
+					})
+					.collect::<Vec<Cookie>>()
+			} else {
+				vec![]
 			},
 		}
 	}
@@ -202,16 +202,5 @@ impl Request {
 
 	pub fn get_cookie(&self, name: &str) -> Option<&Cookie> {
 		self.cookies.iter().find(|cookie| cookie.key == name)
-	}
-}
-
-impl Debug for Request {
-	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		write!(
-			f,
-			"<HTTP Request {} {}>",
-			self.get_method(),
-			self.get_path()
-		)
 	}
 }

@@ -29,7 +29,7 @@ pub trait Context {
 	fn get_method(&self) -> &HttpMethod {
 		self.get_request().get_method()
 	}
-
+	
 	fn status(&mut self, code: u16) -> &mut Self {
 		self.get_response_mut().set_status(code);
 		self
@@ -58,5 +58,36 @@ pub trait Context {
 
 	fn cookie(&mut self, cookie: &Cookie) -> &mut Self {
 		self.header("Set-Cookie", &cookie.to_header_string())
+	}
+}
+
+#[derive(Clone)]
+pub struct DefaultContext {
+	request: Request,
+	response: Response,
+}
+
+impl Context for DefaultContext {
+	fn create(request: Request) -> Self {
+		DefaultContext {
+			request,
+			response: Response::default()
+		}
+	}
+
+	fn get_request(&self) -> &Request {
+		&self.request
+	}
+
+	fn get_request_mut(&mut self) -> &mut Request {
+		&mut self.request
+	}
+
+	fn get_response(&self) -> &Response {
+		&self.response
+	}
+
+	fn get_response_mut(&mut self) -> &mut Response {
+		&mut self.response
 	}
 }

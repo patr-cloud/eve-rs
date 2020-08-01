@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Response {
 	pub(crate) response: Vec<u8>,
 	pub(crate) status: u16,
@@ -34,5 +34,15 @@ impl Response {
 
 	pub fn set_body_bytes(&mut self, data: &[u8]) {
 		self.response = data.to_vec();
+	}
+}
+
+impl Default for Response {
+	fn default() -> Self {
+		Response {
+			response: vec![],
+			status: 200,
+			headers: HashMap::new(),
+		}
 	}
 }

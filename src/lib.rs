@@ -5,24 +5,26 @@ extern crate hyper;
 extern crate regex;
 extern crate serde;
 extern crate serde_json;
-extern crate tokio;
 
 mod app;
+mod async_compat;
 mod context;
 mod cookie;
 mod http_method;
 mod middleware;
+mod middleware_handler;
 mod request;
 mod response;
 
 pub use app::App;
-pub use context::Context;
+pub use context::{Context, DefaultContext};
 pub use cookie::{Cookie, CookieOptions, SameSite};
 pub use http_method::HttpMethod;
-pub use middleware::{Middleware, NextHandler};
+pub use middleware::{Middleware, NextHandler, DefaultMiddleware};
 pub use request::Request;
 pub use response::Response;
 
+use async_std::net::TcpListener;
 use hyper::{
 	service::{make_service_fn, service_fn},
 	Body, Error, Response as HyperResponse, Server,
@@ -75,72 +77,12 @@ pub async fn listen<TContext, TMiddleware>(
 			}
 		});
 
-		Server::bind(&bind_addr).serve(service).await.unwrap();
+		let tcp_listener = TcpListener::bind(&bind_addr).await.unwrap();
+		Server::builder(async_compat::HyperListener(tcp_listener))
+			.executor(async_compat::HyperExecutor)
+			.serve(service)
+			.await
+			.unwrap();
 	}
 	.await
-}
-
-#[derive(Clone)]
-struct DefCtx {
-	request: Request,
-	response: Response,
-}
-
-impl Context for DefCtx {
-	fn create(request: request::Request) -> Self {
-		DefCtx {
-			request,
-			response: Response::new(),
-		}
-	}
-	fn get_request(&self) -> &request::Request {
-		&self.request
-	}
-	fn get_request_mut(&mut self) -> &mut request::Request {
-		&mut self.request
-	}
-	fn get_response(&self) -> &response::Response {
-		&self.response
-	}
-	fn get_response_mut(&mut self) -> &mut response::Response {
-		&mut self.response
-	}
-}
-
-#[derive(Clone)]
-struct DefMdw {
-	message: String,
-}
-
-#[async_trait]
-impl Middleware<DefCtx> for DefMdw {
-	async fn run(&self, mut context: DefCtx, next: NextHandler<DefCtx>) -> Result<DefCtx, Error> {
-		println!("Pre: {}", self.message);
-		context = next(context).await?;
-		println!("Post: {}", self.message);
-		Ok(context)
-	}
-}
-
-/// Test code
-#[test]
-fn test_server() {
-	let mut app = App::<DefCtx, DefMdw>::new();
-	app.get(
-		"/",
-		&[
-			DefMdw {
-				message: "Test 1".to_owned(),
-			},
-			DefMdw {
-				message: "Test 2".to_owned(),
-			},
-			DefMdw {
-				message: "Test 3".to_owned(),
-			},
-		],
-	);
-	tokio::runtime::Runtime::new().unwrap().block_on(async {
-		listen(app, ([127, 0, 0, 1], 3000)).await;
-	});
 }

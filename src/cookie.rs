@@ -1,4 +1,4 @@
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Cookie {
 	pub key: String,
 	pub value: String,
@@ -44,7 +44,7 @@ impl Cookie {
 	}
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct CookieOptions {
 	pub domain: String,
 	pub path: String,
@@ -56,7 +56,7 @@ pub struct CookieOptions {
 	pub same_site: Option<SameSite>,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum SameSite {
 	Strict,
 	Lax,
