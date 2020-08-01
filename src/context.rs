@@ -1,5 +1,6 @@
 use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
 
+use serde_json::Value;
 use std::str::{self, Utf8Error};
 
 pub trait Context {
@@ -12,12 +13,16 @@ pub trait Context {
 	fn get_body(&self) -> Result<&str, Utf8Error> {
 		self.get_request().get_body()
 	}
+	fn json(&mut self, body: Value) -> &mut Self {
+		self.content_type("application/json")
+			.body(&body.to_string())
+	}
 	fn body(&mut self, string: &str) -> &mut Self {
 		self.get_response_mut().set_body(string);
 		self
 	}
-	fn body_bytes(&mut self, string: &[u8]) -> &mut Self {
-		self.get_response_mut().set_body_bytes(string);
+	fn body_bytes(&mut self, bytes: &[u8]) -> &mut Self {
+		self.get_response_mut().set_body_bytes(bytes);
 		self
 	}
 
