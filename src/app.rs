@@ -136,32 +136,32 @@ where
 	pub fn use_middleware(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.into_iter().for_each(|handler| {
 			self.get_stack
-				.push(self.create_middleware_handler(path, handler.clone(), true));
+				.push(self.create_middleware_handler(path, handler.clone(), false));
 			self.post_stack
-				.push(self.create_middleware_handler(path, handler.clone(), true));
+				.push(self.create_middleware_handler(path, handler.clone(), false));
 			self.put_stack
-				.push(self.create_middleware_handler(path, handler.clone(), true));
+				.push(self.create_middleware_handler(path, handler.clone(), false));
 			self.delete_stack
-				.push(self.create_middleware_handler(path, handler.clone(), true));
+				.push(self.create_middleware_handler(path, handler.clone(), false));
 			self.head_stack
-				.push(self.create_middleware_handler(path, handler.clone(), true));
+				.push(self.create_middleware_handler(path, handler.clone(), false));
 			self.options_stack
-				.push(self.create_middleware_handler(path, handler.clone(), true));
+				.push(self.create_middleware_handler(path, handler.clone(), false));
 			self.connect_stack
-				.push(self.create_middleware_handler(path, handler.clone(), true));
+				.push(self.create_middleware_handler(path, handler.clone(), false));
 			self.patch_stack
-				.push(self.create_middleware_handler(path, handler.clone(), true));
+				.push(self.create_middleware_handler(path, handler.clone(), false));
 			self.trace_stack
-				.push(self.create_middleware_handler(path, handler.clone(), true));
+				.push(self.create_middleware_handler(path, handler.clone(), false));
 		});
 	}
 
 	pub fn use_sub_app(&mut self, base_path: &str, sub_app: App<TContext, TMiddleware>) {
 		let base_path = {
 			if base_path == "/" {
-				base_path.to_string()
+				"".to_string()
 			} else {
-				let mut formatted_base_path = String::new();
+				let mut formatted_base_path = base_path.to_string();
 
 				// If it ends with /, remove it
 				if base_path.ends_with('/') {
@@ -177,13 +177,6 @@ where
 			}
 		};
 
-		// TODO handle regex for base_path as well
-		// Current proposal: Have a regexify_url function to handle all regex
-		// This is required for situations like these:
-		// app.use_sub_app("/:appId/changelog", changelog_handler);
-		// or
-		// app.use_sub_app("/*/application", application_handler);
-
 		let App {
 			get_stack,
 			post_stack,
@@ -198,65 +191,65 @@ where
 
 		for handler in get_stack {
 			self.get_stack.push(self.create_middleware_handler(
-				&format!("{}{}", base_path, handler.path_match.as_str()),
+				&format!("{}{}", base_path, handler.mounted_url),
 				handler.handler,
-				false, // Don't push a $ to the regex. sub_app would've handled that
+				handler.is_endpoint,
 			));
 		}
 		for handler in post_stack {
 			self.get_stack.push(self.create_middleware_handler(
-				&format!("{}{}", base_path, handler.path_match.as_str()),
+				&format!("{}{}", base_path, handler.mounted_url),
 				handler.handler,
-				false, // Don't push a $ to the regex. sub_app would've handled that
+				handler.is_endpoint,
 			));
 		}
 		for handler in put_stack {
 			self.get_stack.push(self.create_middleware_handler(
-				&format!("{}{}", base_path, handler.path_match.as_str()),
+				&format!("{}{}", base_path, handler.mounted_url),
 				handler.handler,
-				false, // Don't push a $ to the regex. sub_app would've handled that
+				handler.is_endpoint,
 			));
 		}
 		for handler in delete_stack {
 			self.get_stack.push(self.create_middleware_handler(
-				&format!("{}{}", base_path, handler.path_match.as_str()),
+				&format!("{}{}", base_path, handler.mounted_url),
 				handler.handler,
-				false, // Don't push a $ to the regex. sub_app would've handled that
+				handler.is_endpoint,
 			));
 		}
 		for handler in head_stack {
 			self.get_stack.push(self.create_middleware_handler(
-				&format!("{}{}", base_path, handler.path_match.as_str()),
+				&format!("{}{}", base_path, handler.mounted_url),
 				handler.handler,
-				false, // Don't push a $ to the regex. sub_app would've handled that
+				handler.is_endpoint,
 			));
 		}
 		for handler in options_stack {
 			self.get_stack.push(self.create_middleware_handler(
-				&format!("{}{}", base_path, handler.path_match.as_str()),
+				&format!("{}{}", base_path, handler.mounted_url),
 				handler.handler,
-				false, // Don't push a $ to the regex. sub_app would've handled that
+				handler.is_endpoint,
 			));
 		}
 		for handler in connect_stack {
 			self.get_stack.push(self.create_middleware_handler(
-				&format!("{}{}", base_path, handler.path_match.as_str()),
+				&format!("{}{}", base_path, handler.mounted_url),
 				handler.handler,
-				false, // Don't push a $ to the regex. sub_app would've handled that
+				handler.is_endpoint,
 			));
 		}
 		for handler in patch_stack {
 			self.get_stack.push(self.create_middleware_handler(
-				&format!("{}{}", base_path, handler.path_match.as_str()),
+				&format!("{}{}", base_path, handler.mounted_url),
 				handler.handler,
-				false, // Don't push a $ to the regex. sub_app would've handled that
+				handler.is_endpoint,
 			));
 		}
 		for handler in trace_stack {
 			self.get_stack.push(self.create_middleware_handler(
-				&format!("{}{}", base_path, handler.path_match.as_str()),
+				&format!("{}{}", base_path, handler.mounted_url),
 				handler.handler,
-				false, // Don't push a $ to the regex. sub_app would've handled that
+				handler.is_endpoint,
 			));
 		}
 	}
