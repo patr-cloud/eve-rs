@@ -15,6 +15,7 @@ mod middleware;
 mod middleware_handler;
 mod request;
 mod response;
+mod error;
 
 pub use app::App;
 pub use context::{Context, DefaultContext};
@@ -23,11 +24,12 @@ pub use http_method::HttpMethod;
 pub use middleware::{Middleware, NextHandler, DefaultMiddleware};
 pub use request::Request;
 pub use response::Response;
+pub use hyper::Error;
 
 use async_std::net::TcpListener;
 use hyper::{
 	service::{make_service_fn, service_fn},
-	Body, Error, Response as HyperResponse, Server,
+	Body, Response as HyperResponse, Server,
 };
 use std::{net::SocketAddr, sync::Arc};
 
