@@ -21,15 +21,16 @@ where
 		if let Some(m) = nodes.clone().get(i) {
 			// add populating the url parameters here
 			let mut url_params = HashMap::new();
-			let captures = m.path_match.captures(context.get_path()).unwrap();
-			for var in m.path_match.capture_names() {
-				if var.is_none() {
-					continue;
-				}
-				let var = var.unwrap();
-				let value = captures.name(var);
-				if let Some(value) = value {
-					url_params.insert(var.to_string(), value.as_str().to_string());
+			if let Some(captures) = m.path_match.captures(context.get_path()) {
+				for var in m.path_match.capture_names() {
+					if var.is_none() {
+						continue;
+					}
+					let var = var.unwrap();
+					let value = captures.name(var);
+					if let Some(value) = value {
+						url_params.insert(var.to_string(), value.as_str().to_string());
+					}
 				}
 			}
 			context.get_request_mut().params = url_params;
