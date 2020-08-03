@@ -2,6 +2,7 @@ use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
 };
+use crate::Cookie;
 
 #[derive(Clone)]
 pub struct Response {
@@ -109,11 +110,11 @@ impl Response {
 		self.headers
 			.insert(key.to_string(), vec![value.to_string()]);
 	}
-	pub fn append_header(&mut self, key: String, value: String) {
-		if let Some(headers) = self.headers.get_mut(&key) {
-			headers.push(value);
+	pub fn append_header(&mut self, key: &str, value: &str) {
+		if let Some(headers) = self.headers.get_mut(key) {
+			headers.push(value.to_string());
 		} else {
-			self.headers.insert(key, vec![value]);
+			self.headers.insert(key.to_string(), vec![value.to_string()]);
 		}
 	}
 	pub fn remove_header(&mut self, field: &str) {
@@ -170,6 +171,10 @@ impl Response {
 	}
 	pub fn set_body_bytes(&mut self, data: &[u8]) {
 		self.body = data.to_vec();
+	}
+
+	pub fn set_cookie(&mut self, cookie: Cookie) {
+		self.append_header("Set-Cookie", &cookie.to_header_string());
 	}
 }
 

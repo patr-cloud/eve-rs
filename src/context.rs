@@ -1,7 +1,7 @@
 use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
 
 use serde_json::Value;
-use std::str::{self, Utf8Error};
+use std::{net::IpAddr, str::{self, Utf8Error}};
 
 pub trait Context {
 	fn create(request: Request) -> Self;
@@ -26,32 +26,106 @@ pub trait Context {
 		self
 	}
 
-	fn get_method(&self) -> &HttpMethod {
+	fn method(&self) -> &HttpMethod {
 		self.get_request().get_method()
 	}
 
+	fn get_status_message(&self) -> &str {
+		self.get_response().get_status_message()
+	}
 	fn status(&mut self, code: u16) -> &mut Self {
 		self.get_response_mut().set_status(code);
 		self
 	}
 
 	fn content_type(&mut self, c_type: &str) -> &mut Self {
-		self.header("Content-Type", c_type)
+		self.get_response_mut().set_content_type(c_type);
+		self
+	}
+
+	fn content_length(&mut self, length: u128) -> &mut Self {
+		self.get_response_mut().set_content_length(length);
+		self
 	}
 
 	fn redirect(&mut self, destination: &str) -> &mut Self {
-		self.status(302).header("Location", destination)
+		self.get_response_mut().redirect(destination);
+		self
 	}
 
-	fn get_url(&self) -> String {
+	fn attachment(&mut self, file_name: Option<&str>) -> &mut Self {
+		self.get_response_mut().attachment(file_name);
+		self
+	}
+
+	fn get_path(&self) -> String {
 		self.get_request().get_path()
 	}
+
+	fn get_full_url(&self) -> String {
+		self.get_request().get_full_url()
+	}
+
+	fn get_origin(&self) -> Option<String> {
+		self.get_request().get_origin()
+	}
+
+	fn get_query_string(&self) -> String {
+		self.get_request().get_query_string()
+	}
+
+	fn get_host(&self) -> String {
+		self.get_request().get_host()
+	}
+
+	fn get_host_and_port(&self) -> String {
+		self.get_request().get_host_and_port()
+	}
+
+	fn get_content_type(&self) -> String {
+		self.get_request().get_content_type()
+	}
+
+	fn get_charset(&self) -> Option<String> {
+		self.get_request().get_charset()
+	}
+
+	fn get_protocol(&self) -> String {
+		self.get_request().get_protocol()
+	}
+
+	fn is_secure(&self) -> bool {
+		self.get_request().is_secure()
+	}
+
+	fn get_ip(&self) -> IpAddr {
+		self.get_request().get_ip()
+	}
+
+	fn get_ips(&self) -> &[IpAddr] {
+		self.get_request().get_ips()
+	}
+
+	fn is(&self, mimes: &[&str]) -> bool {
+		self.get_request().is(mimes)
+	}
+
+	// TODO content negotiation
+	// See: https://koajs.com/#request content negotiation
 
 	fn get_header(&self, key: &str) -> Option<&Vec<String>> {
 		self.get_request().get_headers().get(key)
 	}
 	fn header(&mut self, key: &str, value: &str) -> &mut Self {
 		self.get_response_mut().set_header(key, value);
+		self
+	}
+	fn append_header(&mut self, key: &str, value: &str) -> &mut Self {
+		self.get_response_mut().append_header(key, value);
+		self
+	}
+	fn remove_header(&mut self, key: &str) -> &mut Self {
+		self.get_response_mut().remove_header(key);
 		self
 	}
 
@@ -61,8 +135,19 @@ pub trait Context {
 	fn get_cookies(&self) -> &Vec<Cookie> {
 		self.get_request().get_cookies()
 	}
-	fn cookie(&mut self, cookie: &Cookie) -> &mut Self {
-		self.header("Set-Cookie", &cookie.to_header_string())
+	fn cookie(&mut self, cookie: Cookie) -> &mut Self {
+		self.get_response_mut().set_cookie(cookie);
+		self
+	}
+
+	fn last_modified(&mut self, last_modified: &str) -> &mut Self {
+		self.get_response_mut().set_last_modified(last_modified);
+		self
+	}
+
+	fn etag(&mut self, etag: &str) -> &mut Self {
+		self.get_response_mut().set_etag(etag);
+		self
 	}
 }
 
