@@ -1,6 +1,9 @@
-use std::collections::HashMap;
+use std::{
+	collections::HashMap,
+	fmt::{Debug, Formatter, Result as FmtResult},
+};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Response {
 	pub(crate) body: Vec<u8>,
 	pub(crate) status: u16,
@@ -42,6 +45,20 @@ impl Response {
 	}
 	pub fn set_body_bytes(&mut self, data: &[u8]) {
 		self.body = data.to_vec();
+	}
+}
+
+impl Debug for Response {
+	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+		if cfg!(debug_assertions) {
+			f.debug_struct("Request")
+				.field("body", &self.body)
+				.field("status", &self.status)
+				.field("headers", &self.headers)
+				.finish()
+		} else {
+			write!(f, "[Response {}]", self.status)
+		}
 	}
 }
 

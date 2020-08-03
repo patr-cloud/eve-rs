@@ -4,11 +4,11 @@ use serde::Deserialize;
 use serde_json::Error;
 use std::{
 	collections::HashMap,
-	fmt::Debug,
+	fmt::{Debug, Formatter, Result as FmtResult},
 	str::{self, Utf8Error},
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Request {
 	pub(crate) body: Vec<u8>,
 	pub(crate) method: HttpMethod,
@@ -194,5 +194,24 @@ impl Request {
 
 	pub fn get_cookie(&self, name: &str) -> Option<&Cookie> {
 		self.cookies.iter().find(|cookie| cookie.key == name)
+	}
+}
+
+impl Debug for Request {
+	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+		if cfg!(debug_assertions) {
+			f.debug_struct("Request")
+				.field("body", &self.body)
+				.field("method", &self.method)
+				.field("path", &self.path)
+				.field("version", &self.version)
+				.field("headers", &self.headers)
+				.field("query", &self.query)
+				.field("params", &self.params)
+				.field("cookies", &self.cookies)
+				.finish()
+		} else {
+			write!(f, "[Request {} {}]", self.method, self.path)
+		}
 	}
 }
