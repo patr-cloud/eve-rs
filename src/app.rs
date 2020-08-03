@@ -1,19 +1,20 @@
 use crate::{
-	context::Context, http_method::HttpMethod, middleware::Middleware,
+	context::Context,
+	error::Error,
+	http_method::HttpMethod,
+	middleware::Middleware,
 	middleware_handler::MiddlewareHandler,
 };
 
-use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc};
-
-use hyper::Error;
+use std::{collections::HashMap, fmt::Debug, future::Future, pin::Pin, sync::Arc};
 
 fn chained_run<TContext, TMiddleware>(
 	mut context: TContext,
 	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware>>>,
 	i: usize,
-) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>>
+) -> Pin<Box<dyn Future<Output = Result<TContext, Error<TContext>>> + Send>>
 where
-	TContext: 'static + Context + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Clone + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
 	Box::pin(async move {
@@ -51,7 +52,7 @@ where
 
 pub struct App<TContext, TMiddleware>
 where
-	TContext: 'static + Context + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Clone + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
 	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
@@ -67,7 +68,7 @@ where
 
 impl<TContext, TMiddleware> App<TContext, TMiddleware>
 where
-	TContext: 'static + Context + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Clone + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
 	pub fn new() -> Self {
@@ -85,70 +86,70 @@ where
 	}
 
 	pub fn get(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.get_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
 
 	pub fn post(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.post_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
 
 	pub fn put(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.put_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
 
 	pub fn delete(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.delete_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
 
 	pub fn head(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.head_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
 
 	pub fn options(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.options_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
 
 	pub fn connect(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.connect_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
 
 	pub fn patch(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.patch_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
 
 	pub fn trace(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.trace_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
 
 	pub fn use_middleware(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.into_iter().for_each(|handler| {
+		middlewares.iter().for_each(|handler| {
 			self.get_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), false));
 			self.post_stack
@@ -273,7 +274,7 @@ where
 			}));
 	}
 
-	pub async fn resolve(&self, context: TContext) -> Result<TContext, hyper::Error> {
+	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error<TContext>> {
 		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
 		chained_run(context, Arc::new(stack), 0).await
 	}
@@ -302,5 +303,15 @@ where
 			}
 		}
 		stack
+	}
+}
+
+impl<TContext, TMiddleware> Default for App<TContext, TMiddleware>
+where
+	TContext: 'static + Context + Debug + Clone + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+{
+	fn default() -> Self {
+		Self::new()
 	}
 }

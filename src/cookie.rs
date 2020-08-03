@@ -10,7 +10,7 @@ impl Cookie {
 		let name = &self.key;
 		let value = &self.value;
 		let options = &self.options;
-		
+
 		let mut pieces = vec![format!("Path={}", self.options.path)];
 
 		if options.expires > 0 {

@@ -60,16 +60,8 @@ impl Request {
 							None
 						} else {
 							let mut items = kv.split('=').map(String::from);
-							let key = if let Some(key) = items.next() {
-								key
-							} else {
-								return None;
-							};
-							let value = if let Some(value) = items.next() {
-								value
-							} else {
-								return None;
-							};
+							let key = items.next()?;
+							let value = items.next()?;
 							Some((key, value))
 						}
 					})

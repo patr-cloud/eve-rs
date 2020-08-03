@@ -1,11 +1,11 @@
-use crate::{Middleware, Context};
-use std::marker::PhantomData;
+use crate::{Context, Middleware};
 use regex::Regex;
+use std::{fmt::Debug, marker::PhantomData};
 
 #[derive(Clone)]
 pub(crate) struct MiddlewareHandler<TContext, TMiddleware>
 where
-	TContext: Context + Clone + Send + Sync,
+	TContext: Context + Debug + Clone + Send + Sync,
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
 	pub(crate) is_endpoint: bool,
@@ -17,7 +17,7 @@ where
 
 impl<TContext, TMiddleware> MiddlewareHandler<TContext, TMiddleware>
 where
-	TContext: Context + Clone + Send + Sync,
+	TContext: Context + Debug + Clone + Send + Sync,
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
 	pub(crate) fn new(path: &str, handler: TMiddleware, is_endpoint: bool) -> Self {
@@ -52,7 +52,6 @@ where
 			.replace_all(&regex_path, "(?P<$var>([a-zA-Z0-9_\\.-]+))")
 			.to_string();
 
-		
 		if regex_path != "/" {
 			// If there's something to match with,
 			// add the Regex to mention that both / and non / should match at the end of the url

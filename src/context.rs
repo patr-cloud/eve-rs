@@ -29,7 +29,7 @@ pub trait Context {
 	fn get_method(&self) -> &HttpMethod {
 		self.get_request().get_method()
 	}
-	
+
 	fn status(&mut self, code: u16) -> &mut Self {
 		self.get_response_mut().set_status(code);
 		self
@@ -61,7 +61,7 @@ pub trait Context {
 	}
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DefaultContext {
 	request: Request,
 	response: Response,
@@ -71,7 +71,7 @@ impl Context for DefaultContext {
 	fn create(request: Request) -> Self {
 		DefaultContext {
 			request,
-			response: Response::default()
+			response: Response::default(),
 		}
 	}
 

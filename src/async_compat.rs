@@ -1,10 +1,15 @@
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+	pin::Pin,
+	task::{Context, Poll},
+};
 
-use async_std::io;
-use async_std::net::{TcpListener, TcpStream};
-use async_std::prelude::*;
-use async_std::task;
+use async_std::{
+	io,
+	net::{TcpListener, TcpStream},
+	prelude::*,
+	task,
+};
+use hyper::server::accept::Accept;
 
 #[derive(Clone)]
 pub struct HyperExecutor;
@@ -21,10 +26,11 @@ where
 
 pub struct HyperListener(pub TcpListener);
 
-impl hyper::server::accept::Accept for HyperListener {
+impl Accept for HyperListener {
 	type Conn = HyperStream;
 	type Error = io::Error;
 
+	#[allow(unused_mut)]
 	fn poll_accept(
 		mut self: Pin<&mut Self>,
 		cx: &mut Context,

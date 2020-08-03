@@ -1,5 +1,8 @@
 use hyper::Method;
-use std::fmt::{Display, Formatter, Result};
+use std::{
+	fmt::{Display, Error, Formatter},
+	str::FromStr,
+};
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub enum HttpMethod {
@@ -16,7 +19,7 @@ pub enum HttpMethod {
 }
 
 impl Display for HttpMethod {
-	fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+	fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
 		write!(
 			f,
 			"{}",
@@ -36,19 +39,24 @@ impl Display for HttpMethod {
 	}
 }
 
-impl HttpMethod {
-	pub fn from_str(method: &str) -> Option<Self> {
+impl FromStr for HttpMethod {
+	type Err = String;
+
+	fn from_str(method: &str) -> Result<Self, String> {
 		match method.to_lowercase().as_ref() {
-			"get" => Some(HttpMethod::Get),
-			"post" => Some(HttpMethod::Post),
-			"put" => Some(HttpMethod::Put),
-			"delete" => Some(HttpMethod::Delete),
-			"head" => Some(HttpMethod::Head),
-			"options" => Some(HttpMethod::Options),
-			"connect" => Some(HttpMethod::Connect),
-			"patch" => Some(HttpMethod::Patch),
-			"trace" => Some(HttpMethod::Trace),
-			_ => None,
+			"get" => Ok(HttpMethod::Get),
+			"post" => Ok(HttpMethod::Post),
+			"put" => Ok(HttpMethod::Put),
+			"delete" => Ok(HttpMethod::Delete),
+			"head" => Ok(HttpMethod::Head),
+			"options" => Ok(HttpMethod::Options),
+			"connect" => Ok(HttpMethod::Connect),
+			"patch" => Ok(HttpMethod::Patch),
+			"trace" => Ok(HttpMethod::Trace),
+			_ => Err(format!(
+				"Could not parse a suitable HTTP Method for string: '{}'",
+				method
+			)),
 		}
 	}
 }

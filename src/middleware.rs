@@ -1,34 +1,38 @@
-use crate::context::{Context, DefaultContext};
-use hyper::Error;
-use std::{future::Future, pin::Pin};
+use crate::{
+	context::{Context, DefaultContext},
+	error::Error,
+};
+use std::{fmt::Debug, future::Future, pin::Pin};
 
 pub type NextHandler<TContext> = Box<
-	dyn Fn(TContext) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>> + Send + Sync,
+	dyn Fn(TContext) -> Pin<Box<dyn Future<Output = Result<TContext, Error<TContext>>> + Send>>
+		+ Send
+		+ Sync,
 >;
 
 #[async_trait]
-pub trait Middleware<TContext: Context + Send + Sync> {
-	async fn run(&self, context: TContext, next: NextHandler<TContext>) -> Result<TContext, Error>;
+pub trait Middleware<TContext: Context + Debug + Clone + Send + Sync> {
+	async fn run(
+		&self,
+		context: TContext,
+		next: NextHandler<TContext>,
+	) -> Result<TContext, Error<TContext>>;
 }
+
+type DefaultMiddlewareHandler =
+	fn(
+		DefaultContext,
+		NextHandler<DefaultContext>,
+	) -> Pin<Box<dyn Future<Output = Result<DefaultContext, Error<DefaultContext>>> + Send>>;
 
 #[derive(Clone)]
 pub struct DefaultMiddleware {
-	handler: fn(
-		DefaultContext,
-		NextHandler<DefaultContext>,
-	) -> Pin<Box<dyn Future<Output = Result<DefaultContext, Error>> + Send>>,
+	handler: DefaultMiddlewareHandler,
 }
 
 impl DefaultMiddleware {
-	pub fn new(
-		handler: fn(
-			DefaultContext,
-			NextHandler<DefaultContext>,
-		) -> Pin<Box<dyn Future<Output = Result<DefaultContext, Error>> + Send>>,
-	) -> Self {
-		DefaultMiddleware {
-			handler
-		}
+	pub fn new(handler: DefaultMiddlewareHandler) -> Self {
+		DefaultMiddleware { handler }
 	}
 }
 
@@ -38,7 +42,7 @@ impl Middleware<DefaultContext> for DefaultMiddleware {
 		&self,
 		context: DefaultContext,
 		next: NextHandler<DefaultContext>,
-	) -> Result<DefaultContext, Error> {
+	) -> Result<DefaultContext, Error<DefaultContext>> {
 		(self.handler)(context, next).await
 	}
 }

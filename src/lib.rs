@@ -10,34 +10,37 @@ mod app;
 mod async_compat;
 mod context;
 mod cookie;
+mod error;
 mod http_method;
 mod middleware;
 mod middleware_handler;
 mod request;
 mod response;
-mod error;
 
 pub use app::App;
 pub use context::{Context, DefaultContext};
 pub use cookie::{Cookie, CookieOptions, SameSite};
+pub use error::Error;
 pub use http_method::HttpMethod;
-pub use middleware::{Middleware, NextHandler, DefaultMiddleware};
+pub use middleware::{DefaultMiddleware, Middleware, NextHandler};
 pub use request::Request;
 pub use response::Response;
-pub use hyper::Error;
 
 use async_std::net::TcpListener;
 use hyper::{
 	service::{make_service_fn, service_fn},
-	Body, Response as HyperResponse, Server,
+	Body,
+	Error as HyperError,
+	Response as HyperResponse,
+	Server,
 };
-use std::{net::SocketAddr, sync::Arc};
+use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 
 pub async fn listen<TContext, TMiddleware>(
 	app: App<TContext, TMiddleware>,
 	bind_addr: ([u8; 4], u16),
 ) where
-	TContext: Context + Clone + Send + Sync,
+	TContext: Context + Debug + Clone + Send + Sync,
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
 	let bind_addr = SocketAddr::from(bind_addr);
@@ -49,14 +52,23 @@ pub async fn listen<TContext, TMiddleware>(
 			let app = app_arc.clone();
 
 			async {
-				Ok::<_, Error>(service_fn(move |req: hyper::Request<Body>| {
+				Ok::<_, HyperError>(service_fn(move |req: hyper::Request<Body>| {
 					let app = app.clone();
 					async move {
 						let request = Request::from_hyper(req).await;
 						let context = TContext::create(request);
 
 						// execute app's middlewares
-						let context = app.resolve(context).await?;
+						let result = app.resolve(context).await;
+						let context = match result {
+							Ok(context) => context,
+							Err(err) => {
+								// TODO return a proper formatted error
+								return Ok::<_, HyperError>(HyperResponse::new(Body::from(
+									err.message,
+								)));
+							}
+						};
 						let response = context.get_response();
 
 						let mut hyper_response = HyperResponse::builder();
@@ -68,7 +80,7 @@ pub async fn listen<TContext, TMiddleware>(
 							}
 						}
 
-						Ok::<_, Error>(
+						Ok::<_, HyperError>(
 							hyper_response
 								.status(response.status)
 								.body(Body::from(response.body.clone()))
