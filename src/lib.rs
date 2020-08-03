@@ -29,10 +29,7 @@ pub use response::Response;
 use async_std::net::TcpListener;
 use hyper::{
 	service::{make_service_fn, service_fn},
-	Body,
-	Error as HyperError,
-	Response as HyperResponse,
-	Server,
+	Body, Error as HyperError, Response as HyperResponse, Server,
 };
 use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 

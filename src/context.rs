@@ -10,7 +10,7 @@ pub trait Context {
 	fn get_response(&self) -> &Response;
 	fn get_response_mut(&mut self) -> &mut Response;
 
-	fn get_body(&self) -> Result<&str, Utf8Error> {
+	fn get_body(&self) -> Result<String, Utf8Error> {
 		self.get_request().get_body()
 	}
 	fn json(&mut self, body: Value) -> &mut Self {
@@ -43,7 +43,7 @@ pub trait Context {
 		self.status(302).header("Location", destination)
 	}
 
-	fn get_path(&self) -> &str {
+	fn get_url(&self) -> String {
 		self.get_request().get_path()
 	}
 
@@ -51,11 +51,16 @@ pub trait Context {
 		self.get_request().get_headers().get(key)
 	}
 	fn header(&mut self, key: &str, value: &str) -> &mut Self {
-		self.get_response_mut()
-			.set_header(key.to_owned(), value.to_owned());
+		self.get_response_mut().set_header(key, value);
 		self
 	}
 
+	fn get_cookie(&self, name: &str) -> Option<&Cookie> {
+		self.get_request().get_cookie(name)
+	}
+	fn get_cookies(&self) -> &Vec<Cookie> {
+		self.get_request().get_cookies()
+	}
 	fn cookie(&mut self, cookie: &Cookie) -> &mut Self {
 		self.header("Set-Cookie", &cookie.to_header_string())
 	}

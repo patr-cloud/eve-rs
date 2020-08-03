@@ -1,18 +1,18 @@
 use crate::{cookie::Cookie, CookieOptions, HttpMethod, SameSite};
-use hyper::{body, Body, Request as HyperRequest, Version};
+use hyper::{body, Body, Request as HyperRequest, Uri, Version};
 use serde::Deserialize;
 use serde_json::Error;
 use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
-	str::{self, Utf8Error},
+	str::{self, Utf8Error}, net::IpAddr,
 };
 
 #[derive(Clone)]
 pub struct Request {
 	pub(crate) body: Vec<u8>,
 	pub(crate) method: HttpMethod,
-	pub(crate) path: String,
+	pub(crate) uri: Uri,
 	pub(crate) version: (u8, u8),
 	pub(crate) headers: HashMap<String, Vec<String>>,
 	pub(crate) query: HashMap<String, String>,
@@ -42,7 +42,7 @@ impl Request {
 		Request {
 			body: body::to_bytes(body).await.unwrap().to_vec(),
 			method: HttpMethod::from(parts.method),
-			path: parts.uri.path().to_string(),
+			uri: parts.uri.clone(),
 			version: match parts.version {
 				Version::HTTP_09 => (0, 9),
 				Version::HTTP_10 => (1, 0),
@@ -145,8 +145,8 @@ impl Request {
 		&self.body
 	}
 
-	pub fn get_body(&self) -> Result<&str, Utf8Error> {
-		str::from_utf8(&self.body)
+	pub fn get_body(&self) -> Result<String, Utf8Error> {
+		Ok(str::from_utf8(&self.body)?.to_string())
 	}
 
 	pub fn get_body_as<'a, T>(&self, body: &'a str) -> Result<T, Error>
@@ -160,9 +160,93 @@ impl Request {
 		&self.method
 	}
 
-	pub fn get_path(&self) -> &str {
-		&self.path
+	pub fn get_length(&self) -> u128 {
+		if let Some(length) = self.headers.get("Content-Length") {
+			if let Some(value) = length.get(0) {
+				if let Ok(value) = value.parse::<u128>() {
+					return value;
+				}
+			}
+		}
+		self.body.len() as u128
 	}
+
+	pub fn get_path(&self) -> String {
+		self.uri.path().to_string()
+	}
+
+	pub fn get_full_url(&self) -> String {
+		self.uri.to_string()
+	}
+
+	pub fn get_origin(&self) -> Option<String> {
+		Some(format!(
+			"{}://{}",
+			self.uri.scheme_str()?,
+			self.uri.authority()?
+		))
+	}
+
+	pub fn get_query_string(&self) -> String {
+		self.uri.query().unwrap_or_else(|| "").to_string()
+	}
+
+	pub fn get_host(&self) -> String {
+		self.uri.host().unwrap_or_else(|| "").to_string()
+	}
+
+	pub fn get_host_and_port(&self) -> String {
+		format!(
+			"{}{}",
+			self.uri.host().unwrap(),
+			if let Some(port) = self.uri.port_u16() {
+				format!(":{}", port)
+			} else {
+				String::new()
+			}
+		)
+	}
+
+	pub fn get_content_type(&self) -> String {
+		let c_type = self
+			.get_header("Content-Type")
+			.unwrap_or_else(|| "text/plain".to_string());
+		c_type.split(';').next().unwrap_or("").to_string()
+	}
+
+	pub fn get_charset(&self) -> Option<String> {
+		let header = self.get_header("Content-Type")?;
+		let charset_index = header.find("charset=")?;
+		let data = &header[charset_index..];
+		Some(data[(charset_index + 8)..data.find(';').unwrap_or_else(|| data.len())].to_string())
+	}
+
+	pub fn get_protocol(&self) -> String {
+		// TODO support X-Forwarded-Proto
+		self.uri.scheme_str().unwrap_or_else(|| "http").to_string()
+	}
+
+	pub fn is_secure(&self) -> bool {
+		self.get_protocol() == "https"
+	}
+
+	pub fn get_ip(&self) -> IpAddr {
+		todo!()
+	}
+
+	pub fn get_ips(&self) -> &[IpAddr] {
+		todo!()
+	}
+
+	pub fn is(&self, mimes: &[&str]) -> bool {
+		let given = self.get_content_type();
+		mimes.iter().any(|mime| {
+			mime == &given
+		})
+	}
+
+	// TODO content negotiation
+	// See: https://koajs.com/#request content negotiation
 
 	pub fn get_version(&self) -> String {
 		format!("{}.{}", self.version.0, self.version.1)
@@ -176,8 +260,31 @@ impl Request {
 		self.version.1
 	}
 
+	pub fn get_header(&self, field: &str) -> Option<String> {
+		self.headers.iter().find_map(|(key, value)| {
+			if key.to_lowercase() == field.to_lowercase() {
+				Some(value.join("\n"))
+			} else {
+				None
+			}
+		})
+	}
 	pub fn get_headers(&self) -> &HashMap<String, Vec<String>> {
 		&self.headers
+	}
+	pub fn set_header(&mut self, field: &str, value: &str) {
+		self.headers
+			.insert(field.to_string(), vec![value.to_string()]);
+	}
+	pub fn append_header(&mut self, key: String, value: String) {
+		if let Some(headers) = self.headers.get_mut(&key) {
+			headers.push(value);
+		} else {
+			self.headers.insert(key, vec![value]);
+		}
+	}
+	pub fn remove_header(&mut self, field: &str) {
+		self.headers.remove(field);
 	}
 
 	pub fn get_query(&self) -> &HashMap<String, String> {
@@ -203,7 +310,7 @@ impl Debug for Request {
 			f.debug_struct("Request")
 				.field("body", &self.body)
 				.field("method", &self.method)
-				.field("path", &self.path)
+				.field("path", &self.get_path())
 				.field("version", &self.version)
 				.field("headers", &self.headers)
 				.field("query", &self.query)
@@ -211,7 +318,7 @@ impl Debug for Request {
 				.field("cookies", &self.cookies)
 				.finish()
 		} else {
-			write!(f, "[Request {} {}]", self.method, self.path)
+			write!(f, "[Request {} {}]", self.method, self.get_path())
 		}
 	}
 }

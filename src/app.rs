@@ -21,7 +21,7 @@ where
 		if let Some(m) = nodes.clone().get(i) {
 			// add populating the url parameters here
 			let mut url_params = HashMap::new();
-			if let Some(captures) = m.path_match.captures(context.get_path()) {
+			if let Some(captures) = m.path_match.captures(&context.get_url()) {
 				for var in m.path_match.capture_names() {
 					if var.is_none() {
 						continue;
@@ -42,7 +42,7 @@ where
 				.await
 		} else {
 			let method = context.get_method().to_string();
-			let path = context.get_path().to_string();
+			let path = context.get_url();
 			context
 				.status(404)
 				.body(&format!("Cannot {} route {}", method, path));
@@ -276,14 +276,14 @@ where
 	}
 
 	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error<TContext>> {
-		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
+		let stack = self.get_middleware_stack(context.get_method(), context.get_url());
 		chained_run(context, Arc::new(stack), 0).await
 	}
 
 	fn get_middleware_stack(
 		&self,
 		method: &HttpMethod,
-		path: &str,
+		path: String,
 	) -> Vec<MiddlewareHandler<TContext, TMiddleware>> {
 		let mut stack = vec![];
 		let route_stack = match method {
@@ -299,7 +299,7 @@ where
 			_ => unreachable!("Getting a middleware stack for use? What?"),
 		};
 		for handler in route_stack {
-			if handler.is_match(path) {
+			if handler.is_match(&path) {
 				stack.push(handler.clone());
 			}
 		}
