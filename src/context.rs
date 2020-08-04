@@ -30,6 +30,9 @@ pub trait Context {
 		self.get_request().get_method()
 	}
 
+	fn get_status(&self) -> u16 {
+		self.get_response().get_status()
+	}
 	fn get_status_message(&self) -> &str {
 		self.get_response().get_status_message()
 	}
@@ -38,8 +41,8 @@ pub trait Context {
 		self
 	}
 
-	fn content_type(&mut self, c_type: &str) -> &mut Self {
-		self.get_response_mut().set_content_type(c_type);
+	fn content_type(&mut self, content_type: &str) -> &mut Self {
+		self.get_response_mut().set_content_type(content_type);
 		self
 	}
 
