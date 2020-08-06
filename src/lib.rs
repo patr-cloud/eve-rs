@@ -5,6 +5,9 @@ extern crate hyper;
 extern crate regex;
 extern crate serde;
 extern crate serde_json;
+extern crate url;
+extern crate log;
+extern crate chrono;
 
 mod app;
 mod async_compat;
@@ -17,6 +20,8 @@ mod middleware_handler;
 mod request;
 mod response;
 
+pub mod default_middlewares;
+
 pub use app::App;
 pub use context::{Context, DefaultContext};
 pub use cookie::{Cookie, CookieOptions, SameSite};
@@ -26,10 +31,11 @@ pub use middleware::{DefaultMiddleware, Middleware, NextHandler};
 pub use request::Request;
 pub use response::Response;
 
+use async_compat::HyperStream;
 use async_std::net::TcpListener;
 use hyper::{
 	service::{make_service_fn, service_fn},
-	Body, Error as HyperError, Response as HyperResponse, Server,
+	Body, Error as HyperError, Request as HyperRequest, Response as HyperResponse, Server,
 };
 use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 
@@ -45,14 +51,18 @@ pub async fn listen<TContext, TMiddleware>(
 	let app_arc = Arc::new(app);
 
 	async move {
-		let service = make_service_fn(|_| {
+		let service = make_service_fn(|conn: &HyperStream| {
 			let app = app_arc.clone();
+			let remote_addr = conn
+				.0
+				.peer_addr()
+				.unwrap_or_else(|_| ([0, 0, 0, 0], 0).into());
 
-			async {
-				Ok::<_, HyperError>(service_fn(move |req: hyper::Request<Body>| {
+			async move {
+				Ok::<_, HyperError>(service_fn(move |req: HyperRequest<Body>| {
 					let app = app.clone();
 					async move {
-						let request = Request::from_hyper(req).await;
+						let request = Request::from_hyper(remote_addr, req).await;
 						let context = TContext::create(request);
 
 						// execute app's middlewares
@@ -77,7 +87,7 @@ pub async fn listen<TContext, TMiddleware>(
 							}
 						}
 
-						Ok::<_, HyperError>(
+						Ok::<HyperResponse<Body>, HyperError>(
 							hyper_response
 								.status(response.status)
 								.body(Body::from(response.body.clone()))

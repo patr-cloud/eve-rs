@@ -1,8 +1,9 @@
+use crate::Cookie;
+use chrono::Local;
 use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
 };
-use crate::Cookie;
 
 #[derive(Clone)]
 pub struct Response {
@@ -90,8 +91,8 @@ impl Response {
 		self.status = code;
 	}
 
-	pub fn set_content_length(&mut self, length: u128) {
-		self.set_header("Content-Length", &format!("{}", length));
+	pub fn set_content_length(&mut self, length: usize) {
+		self.set_header("content-length", &format!("{}", length));
 	}
 
 	pub fn get_headers(&self) -> &HashMap<String, Vec<String>> {
@@ -114,7 +115,8 @@ impl Response {
 		if let Some(headers) = self.headers.get_mut(key) {
 			headers.push(value.to_string());
 		} else {
-			self.headers.insert(key.to_string(), vec![value.to_string()]);
+			self.headers
+				.insert(key.to_string(), vec![value.to_string()]);
 		}
 	}
 	pub fn remove_header(&mut self, field: &str) {
@@ -167,10 +169,12 @@ impl Response {
 		&self.body
 	}
 	pub fn set_body(&mut self, data: &str) {
-		self.body = data.as_bytes().to_vec();
+		self.set_body_bytes(data.as_bytes());
 	}
 	pub fn set_body_bytes(&mut self, data: &[u8]) {
 		self.body = data.to_vec();
+		self.set_content_length(data.len());
+		self.set_header("date", &Local::now().to_rfc2822());
 	}
 
 	pub fn set_cookie(&mut self, cookie: Cookie) {

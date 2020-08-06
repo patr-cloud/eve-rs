@@ -5,7 +5,7 @@ use crate::Context;
 #[derive(Debug)]
 pub struct Error<TContext>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 {
 	pub(crate) context: Option<TContext>,
 	pub(crate) message: String,

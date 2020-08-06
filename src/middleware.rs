@@ -26,18 +26,35 @@ type DefaultMiddlewareHandler =
 	) -> Pin<Box<dyn Future<Output = Result<DefaultContext, Error<DefaultContext>>> + Send>>;
 
 #[derive(Clone)]
-pub struct DefaultMiddleware {
+pub struct DefaultMiddleware<TData>
+where
+	TData: Default + Clone + Send + Sync,
+{
 	handler: DefaultMiddlewareHandler,
+	data: TData,
 }
 
-impl DefaultMiddleware {
+impl<TData> DefaultMiddleware<TData>
+where
+	TData: Default + Clone + Send + Sync,
+{
 	pub fn new(handler: DefaultMiddlewareHandler) -> Self {
-		DefaultMiddleware { handler }
+		DefaultMiddleware {
+			handler,
+			data: Default::default(),
+		}
+	}
+
+	pub fn new_with_data(handler: DefaultMiddlewareHandler, data: TData) -> Self {
+		DefaultMiddleware { handler, data }
 	}
 }
 
 #[async_trait]
-impl Middleware<DefaultContext> for DefaultMiddleware {
+impl<TData> Middleware<DefaultContext> for DefaultMiddleware<TData>
+where
+	TData: Default + Clone + Send + Sync,
+{
 	async fn run(
 		&self,
 		context: DefaultContext,

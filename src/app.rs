@@ -1,16 +1,13 @@
 use crate::{
-	context::Context,
-	error::Error,
-	http_method::HttpMethod,
-	middleware::Middleware,
+	context::Context, error::Error, http_method::HttpMethod, middleware::Middleware,
 	middleware_handler::MiddlewareHandler,
 };
 
-use std::{collections::HashMap, fmt::Debug, future::Future, pin::Pin, sync::Arc};
+use std::{collections::HashMap, fmt::Debug, future::Future, pin::Pin};
 
 fn chained_run<TContext, TMiddleware>(
 	mut context: TContext,
-	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware>>>,
+	nodes: Vec<MiddlewareHandler<TContext, TMiddleware>>,
 	i: usize,
 ) -> Pin<Box<dyn Future<Output = Result<TContext, Error<TContext>>> + Send>>
 where
@@ -41,7 +38,7 @@ where
 				)
 				.await
 		} else {
-			let method = context.method().to_string();
+			let method = context.get_method().to_string();
 			let path = context.get_path();
 			context
 				.status(404)
@@ -89,6 +86,10 @@ where
 	pub fn get(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
 			self.get_stack
+				.push(MiddlewareHandler::new(path, handler.clone(), true));
+		});
+		middlewares.iter().for_each(|handler| {
+			self.trace_stack
 				.push(MiddlewareHandler::new(path, handler.clone(), true));
 		});
 	}
@@ -276,8 +277,8 @@ where
 	}
 
 	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error<TContext>> {
-		let stack = self.get_middleware_stack(context.method(), context.get_path());
-		chained_run(context, Arc::new(stack), 0).await
+		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
+		chained_run(context, stack, 0).await
 	}
 
 	fn get_middleware_stack(

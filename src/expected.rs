@@ -1,14 +1,20 @@
-use express;
+use crate::{listen, App, Context, DefaultContext, DefaultMiddleware, Error, NextHandler};
 
 async fn main() {
-	let app = express::new();
+	let mut app = App::new();
 
-	app.use_middleware([middleware]);
-	app.use_router(express::router());
+	app.use_middleware(
+		"/",
+		&[DefaultMiddleware::<()>::new(|context, next| {
+			Box::pin(async { Ok(context) })
+		})],
+	);
+	app.use_middleware(
+		"/",
+		&[DefaultMiddleware::<String>::new(|context, next| {
+			Box::pin(async { Ok(context) })
+		})],
+	);
 
-	express::listen(app, [127, 0, 0, 1], 3000).await;
-}
-
-async fn middleware(context: Context, next: NextHandler<Context>) -> Result<Context, Error> {
-	
+	listen(app, ([127, 0, 0, 1], 3000)).await;
 }

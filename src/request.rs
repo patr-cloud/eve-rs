@@ -1,15 +1,15 @@
 use crate::{cookie::Cookie, CookieOptions, HttpMethod, SameSite};
 use hyper::{body, Body, Request as HyperRequest, Uri, Version};
-use serde::Deserialize;
-use serde_json::Error;
 use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
-	str::{self, Utf8Error}, net::IpAddr,
+	net::{IpAddr, SocketAddr},
+	str::{self, Utf8Error},
 };
 
 #[derive(Clone)]
 pub struct Request {
+	pub(crate) socket_addr: SocketAddr,
 	pub(crate) body: Vec<u8>,
 	pub(crate) method: HttpMethod,
 	pub(crate) uri: Uri,
@@ -21,7 +21,7 @@ pub struct Request {
 }
 
 impl Request {
-	pub async fn from_hyper(req: HyperRequest<Body>) -> Self {
+	pub async fn from_hyper(socket_addr: SocketAddr, req: HyperRequest<Body>) -> Self {
 		let (parts, body) = req.into_parts();
 		let mut headers = HashMap::<String, Vec<String>>::new();
 		parts.headers.iter().for_each(|(key, value)| {
@@ -40,6 +40,7 @@ impl Request {
 			}
 		});
 		Request {
+			socket_addr,
 			body: body::to_bytes(body).await.unwrap().to_vec(),
 			method: HttpMethod::from(parts.method),
 			uri: parts.uri.clone(),
@@ -149,13 +150,6 @@ impl Request {
 		Ok(str::from_utf8(&self.body)?.to_string())
 	}
 
-	pub fn get_body_as<'a, T>(&self, body: &'a str) -> Result<T, Error>
-	where
-		T: Deserialize<'a>,
-	{
-		serde_json::from_str(body)
-	}
-
 	pub fn get_method(&self) -> &HttpMethod {
 		&self.method
 	}
@@ -231,18 +225,12 @@ impl Request {
 	}
 
 	pub fn get_ip(&self) -> IpAddr {
-		todo!()
-	}
-
-	pub fn get_ips(&self) -> &[IpAddr] {
-		todo!()
+		self.socket_addr.ip()
 	}
 
 	pub fn is(&self, mimes: &[&str]) -> bool {
 		let given = self.get_content_type();
-		mimes.iter().any(|mime| {
-			mime == &given
-		})
+		mimes.iter().any(|mime| mime == &given)
 	}
 
 	// TODO content negotiation

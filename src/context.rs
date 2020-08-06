@@ -26,7 +26,7 @@ pub trait Context {
 		self
 	}
 
-	fn method(&self) -> &HttpMethod {
+	fn get_method(&self) -> &HttpMethod {
 		self.get_request().get_method()
 	}
 
@@ -46,7 +46,7 @@ pub trait Context {
 		self
 	}
 
-	fn content_length(&mut self, length: u128) -> &mut Self {
+	fn content_length(&mut self, length: usize) -> &mut Self {
 		self.get_response_mut().set_content_length(length);
 		self
 	}
@@ -105,10 +105,6 @@ pub trait Context {
 		self.get_request().get_ip()
 	}
 
-	fn get_ips(&self) -> &[IpAddr] {
-		self.get_request().get_ips()
-	}
-
 	fn is(&self, mimes: &[&str]) -> bool {
 		self.get_request().is(mimes)
 	}
@@ -158,6 +154,17 @@ pub trait Context {
 pub struct DefaultContext {
 	request: Request,
 	response: Response,
+	body: Option<Value>,
+}
+
+impl DefaultContext {
+	pub fn get_body_object(&self) -> Option<&Value> {
+		self.body.as_ref()
+	}
+
+	pub fn set_body_object(&mut self, body: Value) {
+		self.body = Some(body);
+	}
 }
 
 impl Context for DefaultContext {
@@ -165,6 +172,7 @@ impl Context for DefaultContext {
 		DefaultContext {
 			request,
 			response: Response::default(),
+			body: None,
 		}
 	}
 
