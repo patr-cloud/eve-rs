@@ -9,7 +9,7 @@ pub struct StaticFileServer {
 
 impl StaticFileServer {
 	pub fn create(folder_path: &str) -> StaticFileServer {
-		let folder_path = if folder_path.ends_with("/") {
+		let folder_path = if folder_path.ends_with('/') {
 			&folder_path[..folder_path.len() - 1]
 		} else {
 			folder_path

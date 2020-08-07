@@ -1,6 +1,5 @@
 use crate::{Context, DefaultMiddleware, Error};
 use serde_json::Value;
-use serde_urlencoded;
 use std::fmt::Debug;
 
 pub fn parser<TContext>(context: &TContext) -> Result<Option<Value>, Error<TContext>>

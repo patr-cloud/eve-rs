@@ -100,7 +100,7 @@ where
 				&context.get_header("Referer").unwrap_or_else(|| {
 					context
 						.get_header("Referrer")
-						.unwrap_or_else(|| String::new())
+						.unwrap_or_else(String::new)
 				}),
 			)
 			.replace(":remote-addr", &context.get_ip().to_string())
@@ -128,7 +128,7 @@ where
 				":user-agent",
 				&context
 					.get_header("User-Agent")
-					.unwrap_or_else(|| String::new()),
+					.unwrap_or_else(String::new),
 			)
 			.replace(
 				":content-length",

@@ -26,7 +26,7 @@ impl CompressionHandler {
 		let allowed_encodings = context
 			.get_request()
 			.get_header("Accept-Encoding")
-			.unwrap_or_else(|| String::new());
+			.unwrap_or_else(String::new);
 		let allowed_encodings = allowed_encodings
 			.split(',')
 			.map(str::trim)
@@ -38,7 +38,7 @@ impl CompressionHandler {
 			let result = GzBuilder::new()
 				.buf_read(data.as_ref(), self.compression_level)
 				.read_to_end(&mut output);
-			if let Ok(_) = result {
+			if result.is_ok() {
 				context
 					.body_bytes(&output)
 					.header("Content-Encoding", "gzip");
