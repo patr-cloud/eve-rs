@@ -3,7 +3,7 @@ use std::fmt::Debug;
 
 pub fn parser<TContext>(context: &mut TContext)
 where
-	TContext: 'static + Context + Debug + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Send + Sync,
 {
 	let header = context.get_header("Cookie");
 	if header.is_none() {

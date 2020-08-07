@@ -15,7 +15,7 @@ where
 
 impl<TContext> Error<TContext>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 {
 	pub fn new(
 		context: Option<TContext>,
@@ -52,7 +52,7 @@ where
 
 impl<TContext, StdErr> From<StdErr> for Error<TContext>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 	StdErr: 'static + StdError,
 {
 	fn from(err: StdErr) -> Self {

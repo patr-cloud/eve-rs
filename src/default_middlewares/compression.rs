@@ -21,7 +21,7 @@ impl CompressionHandler {
 
 	pub fn compress<TContext>(&mut self, context: &mut TContext)
 	where
-		TContext: Context + Debug + Clone + Send + Sync,
+		TContext: Context + Debug + Send + Sync,
 	{
 		let allowed_encodings = context
 			.get_request()

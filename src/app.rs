@@ -3,15 +3,15 @@ use crate::{
 	middleware_handler::MiddlewareHandler,
 };
 
-use std::{collections::HashMap, fmt::Debug, future::Future, pin::Pin};
+use std::{collections::HashMap, fmt::Debug, future::Future, pin::Pin, sync::Arc};
 
 fn chained_run<TContext, TMiddleware>(
 	mut context: TContext,
-	nodes: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware>>>,
 	i: usize,
 ) -> Pin<Box<dyn Future<Output = Result<TContext, Error<TContext>>> + Send>>
 where
-	TContext: 'static + Context + Debug + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
 	Box::pin(async move {
@@ -50,7 +50,7 @@ where
 
 pub struct App<TContext, TMiddleware>
 where
-	TContext: 'static + Context + Debug + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
 	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
@@ -66,7 +66,7 @@ where
 
 impl<TContext, TMiddleware> App<TContext, TMiddleware>
 where
-	TContext: 'static + Context + Debug + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
 	pub fn new() -> Self {
@@ -278,7 +278,7 @@ where
 
 	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error<TContext>> {
 		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
-		chained_run(context, stack, 0).await
+		chained_run(context, Arc::new(stack), 0).await
 	}
 
 	fn get_middleware_stack(
@@ -286,7 +286,7 @@ where
 		method: &HttpMethod,
 		path: String,
 	) -> Vec<MiddlewareHandler<TContext, TMiddleware>> {
-		let mut stack = vec![];
+		let mut stack: Vec<MiddlewareHandler<TContext, TMiddleware>> = vec![];
 		let route_stack = match method {
 			HttpMethod::Get => &self.get_stack,
 			HttpMethod::Post => &self.post_stack,
@@ -310,7 +310,7 @@ where
 
 impl<TContext, TMiddleware> Default for App<TContext, TMiddleware>
 where
-	TContext: 'static + Context + Debug + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 {
 	fn default() -> Self {

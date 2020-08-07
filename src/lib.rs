@@ -46,7 +46,7 @@ pub async fn listen<TContext, TMiddleware>(
 	bind_addr: ([u8; 4], u16),
 	shutdown_signal: Option<Receiver<()>>,
 ) where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
 	let bind_addr = SocketAddr::from(bind_addr);

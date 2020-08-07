@@ -5,7 +5,7 @@ use std::fmt::Debug;
 
 pub fn parser<TContext>(context: &TContext) -> Result<Option<Value>, Error<TContext>>
 where
-	TContext: 'static + Context + Debug + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Send + Sync,
 {
 	if context.is(&["application/x-www-form-urlencoded"]) {
 		let body = context
@@ -20,7 +20,7 @@ where
 
 pub fn default_parser<TData>() -> DefaultMiddleware<TData>
 where
-	TData: Default + Clone + Send + Sync,
+	TData: Default + Send + Clone + Sync,
 {
 	DefaultMiddleware::new(|mut context, next| {
 		Box::pin(async move {

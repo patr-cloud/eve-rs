@@ -4,7 +4,7 @@ use std::fmt::Debug;
 
 pub fn parser<TContext>(context: &TContext) -> Result<Option<Value>, Error<TContext>>
 where
-	TContext: 'static + Context + Debug + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Send + Sync,
 {
 	if context.is(&["application/json"]) {
 		let body = context

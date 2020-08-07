@@ -5,7 +5,7 @@ use std::{fmt::Debug, time::Instant};
 
 pub struct LoggerMiddleware<TContext>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 {
 	log_format: String,
 	should_skip: fn(&TContext) -> bool,
@@ -14,7 +14,7 @@ where
 
 impl<TContext> LoggerMiddleware<TContext>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 {
 	pub fn create(
 		log_format: &str,
@@ -160,14 +160,14 @@ where
 
 pub fn default<TContext>() -> LoggerMiddleware<TContext>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 {
 	LoggerMiddleware::create("dev", |_| false)
 }
 
 pub fn with_format<TContext>(format: &str) -> LoggerMiddleware<TContext>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 {
 	LoggerMiddleware::create(format, |_| false)
 }
@@ -177,7 +177,7 @@ pub fn with_format_and_skippable<TContext>(
 	should_skip: fn(&TContext) -> bool,
 ) -> LoggerMiddleware<TContext>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 {
 	LoggerMiddleware::create(format, should_skip)
 }

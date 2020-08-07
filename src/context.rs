@@ -150,7 +150,7 @@ pub trait Context {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct DefaultContext {
 	request: Request,
 	response: Response,

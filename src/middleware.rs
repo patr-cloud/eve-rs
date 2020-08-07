@@ -11,7 +11,7 @@ pub type NextHandler<TContext> = Box<
 >;
 
 #[async_trait]
-pub trait Middleware<TContext: Context + Debug + Clone + Send + Sync> {
+pub trait Middleware<TContext: Context + Debug + Send + Sync> {
 	async fn run(
 		&self,
 		context: TContext,

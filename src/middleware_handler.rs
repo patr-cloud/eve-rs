@@ -2,10 +2,9 @@ use crate::{Context, Middleware};
 use regex::Regex;
 use std::{fmt::Debug, marker::PhantomData};
 
-#[derive(Clone)]
 pub(crate) struct MiddlewareHandler<TContext, TMiddleware>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
 	pub(crate) is_endpoint: bool,
@@ -15,9 +14,25 @@ where
 	phantom: PhantomData<TContext>,
 }
 
+impl<TContext, TMiddleware> Clone for MiddlewareHandler<TContext, TMiddleware>
+where
+	TContext: Context + Debug + Send + Sync,
+	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+{
+	fn clone(&self) -> Self {
+		MiddlewareHandler {
+			is_endpoint: self.is_endpoint,
+			mounted_url: self.mounted_url.clone(),
+			path_match: self.path_match.clone(),
+			handler: self.handler.clone(),
+			phantom: PhantomData
+		}
+	}
+}
+
 impl<TContext, TMiddleware> MiddlewareHandler<TContext, TMiddleware>
 where
-	TContext: Context + Debug + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
 	pub(crate) fn new(path: &str, handler: TMiddleware, is_endpoint: bool) -> Self {

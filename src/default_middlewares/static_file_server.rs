@@ -23,7 +23,7 @@ impl StaticFileServer {
 		next: NextHandler<TContext>,
 	) -> Result<TContext, Error<TContext>>
 	where
-		TContext: Context + Debug + Clone + Send + Sync,
+		TContext: Context + Debug + Send + Sync,
 	{
 		let file_location = format!("{}{}", self.folder_path, context.get_path());
 		let path = Path::new(&file_location);
