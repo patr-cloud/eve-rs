@@ -1,9 +1,11 @@
 use crate::{
 	context::Context, error::Error, http_method::HttpMethod, middleware::Middleware,
-	middleware_handler::MiddlewareHandler,
+	middleware_handler::MiddlewareHandler, Request,
 };
 
 use std::{collections::HashMap, fmt::Debug, future::Future, pin::Pin, sync::Arc};
+
+type ContextGeneratorFn<TContext, TState> = fn(Request, &TState) -> TContext;
 
 fn chained_run<TContext, TMiddleware>(
 	mut context: TContext,
@@ -32,7 +34,7 @@ where
 			}
 			context.get_request_mut().params = url_params;
 			m.handler
-				.run(
+				.run_middleware(
 					context,
 					Box::new(move |context| chained_run(context, nodes.clone(), i + 1)),
 				)
@@ -48,11 +50,15 @@ where
 	})
 }
 
-pub struct App<TContext, TMiddleware>
+pub struct App<TContext, TMiddleware, TState>
 where
-	TContext: 'static + Context + Debug + Send + Sync,
-	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
+	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TState: Send + Sync,
 {
+	context_generator: ContextGeneratorFn<TContext, TState>,
+	state: TState,
+	
 	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
 	post_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
 	put_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
@@ -64,13 +70,17 @@ where
 	trace_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
 }
 
-impl<TContext, TMiddleware> App<TContext, TMiddleware>
+impl<TContext, TMiddleware, TState> App<TContext, TMiddleware, TState>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+	TState: Send + Sync,
 {
-	pub fn new() -> Self {
+	pub fn create(context_generator: ContextGeneratorFn<TContext, TState>, state: TState) -> Self {
 		App {
+			context_generator,
+			state,
+
 			get_stack: vec![],
 			post_stack: vec![],
 			put_stack: vec![],
@@ -81,6 +91,10 @@ where
 			patch_stack: vec![],
 			trace_stack: vec![],
 		}
+	}
+
+	pub fn get_state(&self) -> &TState {
+		&self.state
 	}
 
 	pub fn get(&mut self, path: &str, middlewares: &[TMiddleware]) {
@@ -173,7 +187,13 @@ where
 		});
 	}
 
-	pub fn use_sub_app(&mut self, base_path: &str, sub_app: App<TContext, TMiddleware>) {
+	pub fn use_sub_app<TSubAppState>(
+		&mut self,
+		base_path: &str,
+		sub_app: App<TContext, TMiddleware, TSubAppState>,
+	) where
+		TSubAppState: Send + Sync,
+	{
 		let base_path = {
 			if base_path == "/" {
 				"".to_string()
@@ -281,6 +301,10 @@ where
 		chained_run(context, Arc::new(stack), 0).await
 	}
 
+	pub(crate) fn generate_context(&self, request: Request) -> TContext {
+		(self.context_generator)(request, self.get_state())
+	}
+
 	fn get_middleware_stack(
 		&self,
 		method: &HttpMethod,
@@ -308,12 +332,13 @@ where
 	}
 }
 
-impl<TContext, TMiddleware> Default for App<TContext, TMiddleware>
+impl<TContext, TMiddleware, TState> Default for App<TContext, TMiddleware, TState>
 where
-	TContext: 'static + Context + Debug + Send + Sync,
+	TContext: 'static + Context + Default + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+	TState: Default + Send + Sync,
 {
 	fn default() -> Self {
-		Self::new()
+		Self::create(|_, _| TContext::default(), TState::default())
 	}
 }

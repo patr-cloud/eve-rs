@@ -3,9 +3,9 @@ use std::fmt::Debug;
 
 pub fn parser<TContext>(context: &mut TContext)
 where
-	TContext: 'static + Context + Debug + Send + Sync,
+	TContext: Context + Debug + Send + Sync,
 {
-	let header = context.get_header("Cookie");
+	let header = context.get_request().get_headers().get("Cookie");
 	if header.is_none() {
 		return;
 	}

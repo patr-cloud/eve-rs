@@ -1,7 +1,8 @@
-use crate::{Context, Error, NextHandler};
+use crate::{Context, Error, Middleware, NextHandler};
 use async_std::{fs, path::Path};
 use std::fmt::Debug;
 
+#[derive(Clone)]
 pub struct StaticFileServer {
 	folder_path: String,
 }
@@ -34,6 +35,20 @@ impl StaticFileServer {
 		} else {
 			next(context).await
 		}
+	}
+}
+
+#[async_trait]
+impl<TContext> Middleware<TContext> for StaticFileServer
+where
+	TContext: 'static + Context + Debug + Send + Sync,
+{
+	async fn run_middleware(
+		&self,
+		context: TContext,
+		next: NextHandler<TContext>,
+	) -> Result<TContext, Error<TContext>> {
+		self.serve(context, next).await
 	}
 }
 

@@ -1,10 +1,12 @@
 use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
 
 use serde_json::Value;
-use std::{net::IpAddr, str::{self, Utf8Error}};
+use std::{
+	net::IpAddr,
+	str::{self, Utf8Error},
+};
 
 pub trait Context {
-	fn create(request: Request) -> Self;
 	fn get_request(&self) -> &Request;
 	fn get_request_mut(&mut self) -> &mut Request;
 	fn get_response(&self) -> &Response;
@@ -112,8 +114,8 @@ pub trait Context {
 	// TODO content negotiation
 	// See: https://koajs.com/#request content negotiation
 
-	fn get_header(&self, key: &str) -> Option<&Vec<String>> {
-		self.get_request().get_headers().get(key)
+	fn get_header(&self, key: &str) -> Option<String> {
+		self.get_request().get_header(key)
 	}
 	fn header(&mut self, key: &str, value: &str) -> &mut Self {
 		self.get_response_mut().set_header(key, value);
@@ -165,17 +167,17 @@ impl DefaultContext {
 	pub fn set_body_object(&mut self, body: Value) {
 		self.body = Some(body);
 	}
-}
 
-impl Context for DefaultContext {
-	fn create(request: Request) -> Self {
+	pub fn new(request: Request) -> Self {
 		DefaultContext {
 			request,
-			response: Response::default(),
+			response: Default::default(),
 			body: None,
 		}
 	}
+}
 
+impl Context for DefaultContext {
 	fn get_request(&self) -> &Request {
 		&self.request
 	}
@@ -191,4 +193,8 @@ impl Context for DefaultContext {
 	fn get_response_mut(&mut self) -> &mut Response {
 		&mut self.response
 	}
+}
+
+pub fn default_context_generator<TState>(request: Request, _: &TState) -> DefaultContext {
+	DefaultContext::new(request)
 }

@@ -24,7 +24,7 @@ mod response;
 pub mod default_middlewares;
 
 pub use app::App;
-pub use context::{Context, DefaultContext};
+pub use context::{default_context_generator, Context, DefaultContext};
 pub use cookie::{Cookie, CookieOptions, SameSite};
 pub use error::Error;
 pub use http_method::HttpMethod;
@@ -41,13 +41,14 @@ use hyper::{
 };
 use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 
-pub async fn listen<TContext, TMiddleware>(
-	app: App<TContext, TMiddleware>,
+pub async fn listen<TContext, TMiddleware, TState>(
+	app: App<TContext, TMiddleware, TState>,
 	bind_addr: ([u8; 4], u16),
 	shutdown_signal: Option<Receiver<()>>,
 ) where
-	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TContext: 'static + Context + Debug + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+	TState: 'static + Send + Sync,
 {
 	let bind_addr = SocketAddr::from(bind_addr);
 
@@ -66,7 +67,7 @@ pub async fn listen<TContext, TMiddleware>(
 					let app = app.clone();
 					async move {
 						let request = Request::from_hyper(remote_addr, req).await;
-						let mut context = TContext::create(request);
+						let mut context = app.generate_context(request);
 						context.header("Server", "Eve");
 
 						// execute app's middlewares

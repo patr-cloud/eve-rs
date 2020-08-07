@@ -10,7 +10,7 @@ where
 	pub(crate) context: Option<TContext>,
 	pub(crate) message: String,
 	pub(crate) status: u16,
-	pub(crate) error: Option<Box<dyn StdError>>,
+	pub(crate) error: Option<Box<dyn StdError + Send>>,
 }
 
 impl<TContext> Error<TContext>
@@ -21,7 +21,7 @@ where
 		context: Option<TContext>,
 		message: String,
 		status: u16,
-		error: Option<Box<dyn StdError>>,
+		error: Option<Box<dyn StdError + Send>>,
 	) -> Self {
 		Error {
 			context,
@@ -48,12 +48,16 @@ where
 			error: None,
 		}
 	}
+
+	pub fn get_context(&mut self) -> Option<&mut TContext> {
+		self.context.as_mut()
+	}
 }
 
 impl<TContext, StdErr> From<StdErr> for Error<TContext>
 where
 	TContext: Context + Debug + Send + Sync,
-	StdErr: 'static + StdError,
+	StdErr: 'static + StdError + Send,
 {
 	fn from(err: StdErr) -> Self {
 		Error {

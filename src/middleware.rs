@@ -12,7 +12,7 @@ pub type NextHandler<TContext> = Box<
 
 #[async_trait]
 pub trait Middleware<TContext: Context + Debug + Send + Sync> {
-	async fn run(
+	async fn run_middleware(
 		&self,
 		context: TContext,
 		next: NextHandler<TContext>,
@@ -55,7 +55,7 @@ impl<TData> Middleware<DefaultContext> for DefaultMiddleware<TData>
 where
 	TData: Default + Clone + Send + Sync,
 {
-	async fn run(
+	async fn run_middleware(
 		&self,
 		context: DefaultContext,
 		next: NextHandler<DefaultContext>,
