@@ -5,9 +5,10 @@ extern crate hyper;
 extern crate regex;
 extern crate serde;
 extern crate serde_json;
-extern crate url;
+extern crate serde_urlencoded;
 extern crate log;
 extern crate chrono;
+extern crate flate2;
 
 mod app;
 mod async_compat;

@@ -1,8 +1,7 @@
 use crate::{Context, DefaultMiddleware, Error};
-use serde_json::Map;
 use serde_json::Value;
+use serde_urlencoded;
 use std::fmt::Debug;
-use url::form_urlencoded::parse;
 
 pub fn parser<TContext>(context: &TContext) -> Result<Option<Value>, Error<TContext>>
 where
@@ -13,12 +12,7 @@ where
 			.get_request()
 			.get_body()
 			.unwrap_or_else(|_| "None".to_string());
-		Ok(Some(Value::Object(
-			parse(body.as_bytes())
-				.into_iter()
-				.map(|(a, b)| (a.to_string(), Value::String(b.to_string())))
-				.collect::<Map<String, Value>>(),
-		)))
+		Ok(Some(serde_urlencoded::from_bytes(body.as_bytes())?))
 	} else {
 		Ok(None)
 	}

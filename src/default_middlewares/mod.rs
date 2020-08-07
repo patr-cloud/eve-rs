@@ -1,5 +1,5 @@
 
-mod compression; // (gz? 7z? tz?)
+pub mod compression; // (gz, deflate)
 pub mod cookie_parser;
 mod helmet;
 pub mod json;
