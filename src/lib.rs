@@ -1,14 +1,14 @@
 #[macro_use]
 extern crate async_trait;
 extern crate async_std;
+extern crate chrono;
+extern crate flate2;
 extern crate hyper;
+extern crate log;
 extern crate regex;
 extern crate serde;
 extern crate serde_json;
 extern crate serde_urlencoded;
-extern crate log;
-extern crate chrono;
-extern crate flate2;
 
 mod app;
 mod async_compat;
@@ -34,15 +34,17 @@ pub use response::Response;
 
 use async_compat::HyperStream;
 use async_std::net::TcpListener;
+use futures::{channel::oneshot::Receiver, future};
 use hyper::{
 	service::{make_service_fn, service_fn},
 	Body, Error as HyperError, Request as HyperRequest, Response as HyperResponse, Server,
 };
 use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 
-pub async fn listen<TContext, TMiddleware>(
+pub async fn listen_on<TContext, TMiddleware>(
 	app: App<TContext, TMiddleware>,
 	bind_addr: ([u8; 4], u16),
+	shutdown_signal: Option<Receiver<()>>,
 ) where
 	TContext: Context + Debug + Clone + Send + Sync,
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
@@ -101,11 +103,23 @@ pub async fn listen<TContext, TMiddleware>(
 		});
 
 		let tcp_listener = TcpListener::bind(&bind_addr).await.unwrap();
-		Server::builder(async_compat::HyperListener(tcp_listener))
+		let server = Server::builder(async_compat::HyperListener(tcp_listener))
 			.executor(async_compat::HyperExecutor)
-			.serve(service)
-			.await
-			.unwrap();
+			.serve(service);
+
+		if let Some(shutdown_signal) = shutdown_signal {
+			server
+				.with_graceful_shutdown(async {
+					if let Err(_) = shutdown_signal.await {
+						// TODO expose this error to the user
+						future::pending::<()>().await;
+					}
+				})
+				.await
+				.unwrap();
+		} else {
+			server.await.unwrap();
+		}
 	}
 	.await
 }
