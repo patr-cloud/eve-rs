@@ -14,15 +14,11 @@ pub struct Response {
 
 impl Response {
 	pub fn new() -> Self {
-		let mut response = Response {
+		Response {
 			body: vec![],
 			status: 200,
 			headers: HashMap::new(),
-		};
-
-		response.set_header("Server", "Eve");
-
-		response
+		}
 	}
 
 	pub fn get_status(&self) -> u16 {

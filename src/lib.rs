@@ -64,7 +64,8 @@ pub async fn listen<TContext, TMiddleware>(
 					let app = app.clone();
 					async move {
 						let request = Request::from_hyper(remote_addr, req).await;
-						let context = TContext::create(request);
+						let mut context = TContext::create(request);
+						context.header("Server", "Eve");
 
 						// execute app's middlewares
 						let result = app.resolve(context).await;
