@@ -41,7 +41,7 @@ use hyper::{
 };
 use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 
-pub async fn listen_on<TContext, TMiddleware>(
+pub async fn listen<TContext, TMiddleware>(
 	app: App<TContext, TMiddleware>,
 	bind_addr: ([u8; 4], u16),
 	shutdown_signal: Option<Receiver<()>>,
