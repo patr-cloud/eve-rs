@@ -50,6 +50,7 @@ where
 	})
 }
 
+#[derive(Clone)]
 pub struct App<TContext, TMiddleware, TState>
 where
 	TContext: Context + Debug + Send + Sync,
