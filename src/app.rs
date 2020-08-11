@@ -1,11 +1,14 @@
 use crate::{
 	context::Context, error::Error, http_method::HttpMethod, middleware::Middleware,
-	middleware_handler::MiddlewareHandler, Request,
+	middleware_handler::MiddlewareHandler, Request, Response,
 };
 
-use std::{collections::HashMap, fmt::Debug, future::Future, pin::Pin, sync::Arc};
+use std::{
+	collections::HashMap, error::Error as StdError, fmt::Debug, future::Future, pin::Pin, sync::Arc,
+};
 
 type ContextGeneratorFn<TContext, TState> = fn(Request, &TState) -> TContext;
+type ErrorHandlerFn = fn(Response, Box<dyn StdError>) -> Response;
 
 fn chained_run<TContext, TMiddleware>(
 	mut context: TContext,
@@ -59,7 +62,8 @@ where
 {
 	context_generator: ContextGeneratorFn<TContext, TState>,
 	state: TState,
-	
+	pub(crate) error_handler: Option<ErrorHandlerFn>,
+
 	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
 	post_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
 	put_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
@@ -81,6 +85,7 @@ where
 		App {
 			context_generator,
 			state,
+			error_handler: None,
 
 			get_stack: vec![],
 			post_stack: vec![],
@@ -96,6 +101,14 @@ where
 
 	pub fn get_state(&self) -> &TState {
 		&self.state
+	}
+
+	pub fn set_error_handler(&mut self, error_handler: ErrorHandlerFn) {
+		self.error_handler = Some(error_handler);
+	}
+
+	pub fn remove_error_handler(&mut self) {
+		self.error_handler = None;
 	}
 
 	pub fn get(&mut self, path: &str, middlewares: &[TMiddleware]) {

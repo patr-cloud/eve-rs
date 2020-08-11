@@ -72,16 +72,20 @@ pub async fn listen<TContext, TMiddleware, TState>(
 
 						// execute app's middlewares
 						let result = app.resolve(context).await;
-						let context = match result {
-							Ok(context) => context,
+						let response = match result {
+							Ok(context) => context.take_response(),
 							Err(err) => {
-								// TODO return a proper formatted error
-								return Ok::<_, HyperError>(HyperResponse::new(Body::from(
-									err.message,
-								)));
+								// return a proper formatted error, if an error handler exists
+								if app.error_handler.is_none() {
+									return Ok::<_, HyperError>(HyperResponse::new(Body::from(
+										err.message,
+									)));
+								} else {
+									let response = Response::new();
+									(app.error_handler.as_ref().unwrap())(response, err.error)
+								}
 							}
 						};
-						let response = context.get_response();
 
 						let mut hyper_response = HyperResponse::builder();
 

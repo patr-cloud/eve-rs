@@ -10,7 +10,7 @@ where
 	pub(crate) context: Option<TContext>,
 	pub(crate) message: String,
 	pub(crate) status: u16,
-	pub(crate) error: Option<Box<dyn StdError + Send>>,
+	pub(crate) error: Box<dyn StdError + Send>,
 }
 
 impl<TContext> Error<TContext>
@@ -21,31 +21,13 @@ where
 		context: Option<TContext>,
 		message: String,
 		status: u16,
-		error: Option<Box<dyn StdError + Send>>,
+		error: Box<dyn StdError + Send>,
 	) -> Self {
 		Error {
 			context,
 			message,
 			status,
 			error,
-		}
-	}
-
-	pub fn unauthorized(context: TContext) -> Self {
-		Error {
-			context: Some(context),
-			message: String::from("Unauthorized"),
-			status: 401,
-			error: None,
-		}
-	}
-
-	pub fn not_found(context: TContext) -> Self {
-		Error {
-			context: Some(context),
-			message: String::from("Not Found"),
-			status: 404,
-			error: None,
 		}
 	}
 
@@ -64,7 +46,7 @@ where
 			context: None,
 			message: String::from("Internal Server Error"),
 			status: 500,
-			error: Some(Box::new(err)),
+			error: Box::new(err),
 		}
 	}
 }

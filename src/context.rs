@@ -10,6 +10,7 @@ pub trait Context {
 	fn get_request(&self) -> &Request;
 	fn get_request_mut(&mut self) -> &mut Request;
 	fn get_response(&self) -> &Response;
+	fn take_response(self) -> Response;
 	fn get_response_mut(&mut self) -> &mut Response;
 
 	fn get_body(&self) -> Result<String, Utf8Error> {
@@ -188,6 +189,10 @@ impl Context for DefaultContext {
 
 	fn get_response(&self) -> &Response {
 		&self.response
+	}
+
+	fn take_response(self) -> Response {
+		self.response
 	}
 
 	fn get_response_mut(&mut self) -> &mut Response {
