@@ -1,8 +1,13 @@
 [package]
 authors = ["Rakshith Ravi <rakshith.ravi@gmx.com>"]
 edition = "2018"
-name = "express-rs"
+name = "eve-rs"
 version = "0.1.0"
+description = "A simple, intuitive, express-like HTTP library"
+license = "MIT"
+documentation = "https://docs.rs/eve-rs"
+homepage = "https://github.com/bytesonus/eve-rs"
+repository = "https://github.com/bytesonus/eve-rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

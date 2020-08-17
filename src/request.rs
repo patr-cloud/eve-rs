@@ -119,7 +119,10 @@ impl Request {
 	}
 
 	pub fn get_host(&self) -> String {
-		self.uri.host().unwrap_or_else(|| "").to_string()
+		self.uri
+			.host()
+			.map(String::from)
+			.unwrap_or_else(|| self.get_header("host").unwrap_or_else(|| "".to_string()))
 	}
 
 	pub fn get_host_and_port(&self) -> String {

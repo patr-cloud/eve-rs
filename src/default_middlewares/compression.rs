@@ -1,7 +1,6 @@
 use crate::{Context, DefaultMiddleware};
 use flate2::{Compress, Compression, FlushCompress, GzBuilder, Status};
-use std::fmt::Debug;
-use std::io::prelude::*;
+use std::{fmt::Debug, io::prelude::*};
 
 pub const DEFAULT_COMPRESSION_LEVEL: u32 = 6;
 

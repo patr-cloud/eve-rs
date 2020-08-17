@@ -25,7 +25,7 @@ where
 			mounted_url: self.mounted_url.clone(),
 			path_match: self.path_match.clone(),
 			handler: self.handler.clone(),
-			phantom: PhantomData
+			phantom: PhantomData,
 		}
 	}
 }

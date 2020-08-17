@@ -57,10 +57,7 @@ where
 			.filter_map(|(index, _)| {
 				let header_end_index = self.log_format[index..].chars().position(|c| c == ']')?;
 				let header_name = &self.log_format[(index + 5)..header_end_index];
-				Some((
-					header_name.to_string(),
-					context.get_header(&header_name)?,
-				))
+				Some((header_name.to_string(), context.get_header(&header_name)?))
 			})
 			.collect::<Vec<(String, String)>>();
 
@@ -97,11 +94,9 @@ where
 			.replace(":method", &context.get_method().to_string())
 			.replace(
 				":referrer",
-				&context.get_header("Referer").unwrap_or_else(|| {
-					context
-						.get_header("Referrer")
-						.unwrap_or_else(String::new)
-				}),
+				&context
+					.get_header("Referer")
+					.unwrap_or_else(|| context.get_header("Referrer").unwrap_or_else(String::new)),
 			)
 			.replace(":remote-addr", &context.get_ip().to_string())
 			.replace(
@@ -126,9 +121,7 @@ where
 			.replace(":url", &context.get_path())
 			.replace(
 				":user-agent",
-				&context
-					.get_header("User-Agent")
-					.unwrap_or_else(String::new),
+				&context.get_header("User-Agent").unwrap_or_else(String::new),
 			)
 			.replace(
 				":content-length",

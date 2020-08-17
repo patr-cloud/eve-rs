@@ -1,10 +1,20 @@
 use crate::{
-	context::Context, error::Error, http_method::HttpMethod, middleware::Middleware,
-	middleware_handler::MiddlewareHandler, Request, Response,
+	context::Context,
+	error::Error,
+	http_method::HttpMethod,
+	middleware::Middleware,
+	middleware_handler::MiddlewareHandler,
+	Request,
+	Response,
 };
 
 use std::{
-	collections::HashMap, error::Error as StdError, fmt::Debug, future::Future, pin::Pin, sync::Arc,
+	collections::HashMap,
+	error::Error as StdError,
+	fmt::Debug,
+	future::Future,
+	pin::Pin,
+	sync::Arc,
 };
 
 type ContextGeneratorFn<TContext, TState> = fn(Request, &TState) -> TContext;

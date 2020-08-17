@@ -37,7 +37,11 @@ use async_std::net::TcpListener;
 use futures::{channel::oneshot::Receiver, future};
 use hyper::{
 	service::{make_service_fn, service_fn},
-	Body, Error as HyperError, Request as HyperRequest, Response as HyperResponse, Server,
+	Body,
+	Error as HyperError,
+	Request as HyperRequest,
+	Response as HyperResponse,
+	Server,
 };
 use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 
