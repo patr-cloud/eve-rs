@@ -15,7 +15,6 @@ pub enum HttpMethod {
 	Connect,
 	Patch,
 	Trace,
-	Use,
 }
 
 impl Display for HttpMethod {
@@ -33,7 +32,6 @@ impl Display for HttpMethod {
 				HttpMethod::Post => "POST",
 				HttpMethod::Put => "PUT",
 				HttpMethod::Trace => "TRACE",
-				HttpMethod::Use => "UNKNOWN",
 			}
 		)
 	}
@@ -73,7 +71,7 @@ impl From<Method> for HttpMethod {
 			Method::CONNECT => HttpMethod::Connect,
 			Method::PATCH => HttpMethod::Patch,
 			Method::TRACE => HttpMethod::Trace,
-			_ => HttpMethod::Use,
+			method => panic!("Could not recognise suitable HTTP method for {}", method),
 		}
 	}
 }

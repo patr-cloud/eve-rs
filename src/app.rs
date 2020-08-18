@@ -345,7 +345,6 @@ where
 			HttpMethod::Connect => &self.connect_stack,
 			HttpMethod::Patch => &self.patch_stack,
 			HttpMethod::Trace => &self.trace_stack,
-			_ => unreachable!("Getting a middleware stack for use? What?"),
 		};
 		for handler in route_stack {
 			if handler.is_match(&path) {

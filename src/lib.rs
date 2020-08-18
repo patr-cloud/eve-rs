@@ -103,7 +103,7 @@ pub async fn listen<TContext, TMiddleware, TState>(
 						Ok::<HyperResponse<Body>, HyperError>(
 							hyper_response
 								.status(response.status)
-								.body(Body::from(response.body.clone()))
+								.body(Body::from(response.body))
 								.unwrap(),
 						)
 					}
