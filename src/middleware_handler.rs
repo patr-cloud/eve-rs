@@ -56,9 +56,23 @@ where
 		}
 
 		let mut regex_path = mounted_url
-			.replace('.', "\\.") // Specifically, match the dot. This ain't a regex character
+			.replace("\\", "\\\\")
+			.replace('.', "\\.")
+			.replace("(", "\\(")
+			.replace(")", "\\)")
+			.replace("^", "\\^")
+			.replace("$", "\\$") // Specifically, match the dot. This ain't a regex character
 			.replace('*', "([^\\/].)+") // Match anything that's not a /, but at least 1 character
-			.replace("**", "(.)+"); //Match anything
+			.replace("**", "(.)+") //Match anything
+			.replace("[", "\\[")
+			.replace("]", "\\]")
+			.replace("^", "\\^")
+			.replace("+", "\\+")
+			.replace("?", "\\?")
+			.replace("{", "\\{")
+			.replace(",", "\\,")
+			.replace("}", "\\}")
+			.replace("|", "\\|");
 
 		// Make a variable out of anything that begins with a : and has a-z, A-Z, 0-9, '_'
 		regex_path = Regex::new(":(?P<var>([a-zA-Z0-9_]+))")
