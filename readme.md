@@ -15,6 +15,7 @@ file name : ```demo.rs```
 //Eve-rs is the package that gives access to Express port files.
 use eve_rs::{App, Context::DefaultContext as Context, Error, NextHandler};
 
+// middleware
 async fn plaintext(mut context: Context, _: NextHandler<Context>) -> Result<Context, Error<Context>> {
     let val = "Hello, World!";
     context.body(val);
@@ -33,8 +34,10 @@ fn main() {
     let port = 8081;
 
     log::info!("Listening for connections on 127.0.0.1:{}", port);
-    listen(eve_app, ([127, 0, 0, 1], port), None).await;
+    listen(app, ([127, 0, 0, 1], port), None).await;
 }
 
 ```
 run the example using ```cargo run``` command.
+
+In the above example we have used  `DefaultContext`  as the  `Context` . This means that express-port gives the freedom to Implement the `Context` in your own way. for the sake of simplicity we have used  `DefaultContext`.
