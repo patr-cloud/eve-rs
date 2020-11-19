@@ -115,7 +115,7 @@ impl Request {
 	}
 
 	pub fn get_query_string(&self) -> String {
-		self.uri.query().unwrap_or_else(|| "").to_string()
+		self.uri.query().unwrap_or("").to_string()
 	}
 
 	pub fn get_host(&self) -> String {
@@ -153,7 +153,7 @@ impl Request {
 
 	pub fn get_protocol(&self) -> String {
 		// TODO support X-Forwarded-Proto
-		self.uri.scheme_str().unwrap_or_else(|| "http").to_string()
+		self.uri.scheme_str().unwrap_or("http").to_string()
 	}
 
 	pub fn is_secure(&self) -> bool {

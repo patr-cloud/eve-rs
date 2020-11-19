@@ -9,8 +9,8 @@ pub struct StaticFileServer {
 
 impl StaticFileServer {
 	pub fn create(folder_path: &str) -> StaticFileServer {
-		let folder_path = if folder_path.ends_with('/') {
-			&folder_path[..folder_path.len() - 1]
+		let folder_path = if let Some(stripped) = folder_path.strip_suffix('/') {
+			stripped
 		} else {
 			folder_path
 		}
@@ -55,7 +55,7 @@ pub fn static_server(folder_path: &str) -> StaticFileServer {
 	StaticFileServer::create(folder_path)
 }
 
-async fn is_file(path: &String) -> bool {
+async fn is_file(path: &str) -> bool {
 	let metadata = fs::metadata(path).await;
 	if metadata.is_err() {
 		return false;

@@ -225,8 +225,8 @@ where
 				let mut formatted_base_path = base_path.to_string();
 
 				// If it ends with /, remove it
-				if base_path.ends_with('/') {
-					formatted_base_path = base_path[..(base_path.len() - 1)].to_string();
+				if let Some(stripped) = base_path.strip_suffix('/') {
+					formatted_base_path = stripped.to_string();
 				}
 
 				// If it doesn't begin with a /, add it
