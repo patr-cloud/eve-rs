@@ -1,17 +1,4 @@
-#[macro_use]
-extern crate async_trait;
-extern crate async_std;
-extern crate chrono;
-extern crate flate2;
-extern crate hyper;
-extern crate log;
-extern crate regex;
-extern crate serde;
-extern crate serde_json;
-extern crate serde_urlencoded;
-
 mod app;
-mod async_compat;
 mod context;
 mod cookie;
 mod error;
@@ -32,10 +19,9 @@ pub use middleware::{DefaultMiddleware, Middleware, NextHandler};
 pub use request::Request;
 pub use response::Response;
 
-use async_compat::HyperStream;
-use async_std::net::TcpListener;
 use futures::{channel::oneshot::Receiver, future};
 use hyper::{
+	server::conn::AddrStream,
 	service::{make_service_fn, service_fn},
 	Body,
 	Error as HyperError,
@@ -59,12 +45,9 @@ pub async fn listen<TContext, TMiddleware, TState>(
 	let app_arc = Arc::new(app);
 
 	async move {
-		let service = make_service_fn(|conn: &HyperStream| {
+		let service = make_service_fn(|conn: &AddrStream| {
 			let app = app_arc.clone();
-			let remote_addr = conn
-				.0
-				.peer_addr()
-				.unwrap_or_else(|_| ([0, 0, 0, 0], 0).into());
+			let remote_addr = conn.remote_addr();
 
 			async move {
 				Ok::<_, HyperError>(service_fn(move |req: HyperRequest<Body>| {
@@ -111,10 +94,7 @@ pub async fn listen<TContext, TMiddleware, TState>(
 			}
 		});
 
-		let tcp_listener = TcpListener::bind(&bind_addr).await.unwrap();
-		let server = Server::builder(async_compat::HyperListener(tcp_listener))
-			.executor(async_compat::HyperExecutor)
-			.serve(service);
+		let server = Server::bind(&bind_addr).serve(service);
 
 		if let Some(shutdown_signal) = shutdown_signal {
 			server

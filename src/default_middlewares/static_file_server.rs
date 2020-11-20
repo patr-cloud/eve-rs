@@ -1,6 +1,6 @@
 use crate::{Context, Error, Middleware, NextHandler};
-use async_std::{fs, path::Path};
 use std::fmt::Debug;
+use tokio::fs;
 
 #[derive(Clone)]
 pub struct StaticFileServer {
@@ -9,8 +9,8 @@ pub struct StaticFileServer {
 
 impl StaticFileServer {
 	pub fn create(folder_path: &str) -> StaticFileServer {
-		let folder_path = if folder_path.ends_with('/') {
-			&folder_path[..folder_path.len() - 1]
+		let folder_path = if let Some(stripped) = folder_path.strip_suffix('/') {
+			stripped
 		} else {
 			folder_path
 		}
@@ -27,8 +27,7 @@ impl StaticFileServer {
 		TContext: Context + Debug + Send + Sync,
 	{
 		let file_location = format!("{}{}", self.folder_path, context.get_path());
-		let path = Path::new(&file_location);
-		if path.exists().await && path.is_file().await {
+		if is_file(&file_location).await {
 			let content = fs::read(file_location).await?;
 			context.body_bytes(&content);
 			Ok(context)
@@ -38,7 +37,7 @@ impl StaticFileServer {
 	}
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl<TContext> Middleware<TContext> for StaticFileServer
 where
 	TContext: 'static + Context + Debug + Send + Sync,
@@ -54,4 +53,12 @@ where
 
 pub fn static_server(folder_path: &str) -> StaticFileServer {
 	StaticFileServer::create(folder_path)
+}
+
+async fn is_file(path: &str) -> bool {
+	let metadata = fs::metadata(path).await;
+	if metadata.is_err() {
+		return false;
+	}
+	metadata.unwrap().is_file()
 }
