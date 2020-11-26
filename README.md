@@ -1,12 +1,12 @@
-# Express-Port
+# Eve-rs
 
-## Express port is a rust http framework which is inspired from Express Node JS framework.
+## Eve-rs is a middleware-based rust http framework which is inspired from ExpressJS framework.
 
 
 
 ### Example
 
-Let's create a demo application using Express-port, using an intuative approach to get a better understanding of the framework.
+Let's create a demo application using eve-rs, using an intuative approach to get a better understanding of the framework.
 
 Create a cargo project, here we have named it demo, and in the `Cargo.toml` file, add the following dependencies under the depedency section.
 
@@ -17,14 +17,12 @@ log = '0.4.8'
 tokio = {version = '0.2.22', features = ['full']}
 ```
 
-Here, `eve-rs` is the crate name for express port.  
-
 after updating toml file, we then enter the following code in the `main.rs` file  
 
 
 <H3> Import eve-rs crate </H3>
 
-First step is to bring `eve_rs` (express port crate) to the scope of the project. So we add the following line
+First step is to bring `eve_rs` to the scope of the project. So we add the following line
 
 ```rust
 use eve_rs::{App as DemoApp, Context, DefaultContext, NextHandler, Error, listen, Request, DefaultMiddleware};
@@ -32,13 +30,13 @@ use eve_rs::{App as DemoApp, Context, DefaultContext, NextHandler, Error, listen
 
 <H3> Middleware </H3>  
 
-Just like in `express` framework, a middleware is basically a function that has access to request and response objects. In `express-port`, we use the same terms, and use middlewares for routing purposes.
+Just like in `express` framework, a middleware is basically a function that has access to request and response objects. In `eve-rs`, we use the same terms, and use middlewares for routing purposes.
 
 For our demo application, we will create a single middleware called `plaintext`, which will print out a plain text on a get request.
 
 A middleware takes in two parameters, `Context` and `NextHandler`. 
 
-`Context` gives you APIs which gives you more information related to the request. Such as getting request body, request status, content type and much more. Since it is a trait (Similar to Interfaces in other programming languages), we get the freedom to define our own context for the application, and on the other hand, the user can use `DefaultContext` provide by express.
+`Context` gives you APIs which gives you more information related to the request. Such as getting request body, request status, content type and much more. Since it is a trait (Similar to Interfaces in other programming languages), we get the freedom to define our own context for the application, and on the other hand, the user can use `DefaultContext` provide by eve.
 
 `NextHandler` is the next middleware in the sequence. That is, if the current middleware called finishes processing and does not throw an error, and next middleware is passed, then after executing the current middleware, the next middleware is called.
 
@@ -48,7 +46,7 @@ In our example code, we do not have a next middleware to be executed, so we give
 async fn plaintext(
 	mut context: DefaultContext,
 	_next: NextHandler<DefaultContext>
-	) -> Result<DefaultContext, Error<DefaultContext>> {
+) -> Result<DefaultContext, Error<DefaultContext>> {
 
 	let val = "Hello, World!";
 	context.body(val);
@@ -64,7 +62,7 @@ async fn plaintext(
 
 ### Create App  
 
-Our next step is to create an express port app. The App struct in express-port gives us a `create()`  function, to create an App. The function takes in two parameters; `context_generator` and  `state`. 
+Our next step is to create an eve app. The App struct in eve-rs gives us a `create()`  function, to create an App. The function takes in two parameters; `context_generator` and  `state`. 
 
 `context_generator` is a function that is responsible to create a context for our middlewares. It takes in two parameters `Request` and  `state`. State, here could be any configuration we need our app to have. Let's assume that we need our app to have some state, so we will pass the state in the following way:
 
@@ -110,7 +108,7 @@ Below is how our code will look by combining all the above explained methods.
 
 ``` rust
 
-// Bring express port modules to the program scope.
+// Bring eve-rs modules to the program scope.
 use eve_rs::{App as DemoApp, Context, DefaultContext, NextHandler, Error, listen, Request, DefaultMiddleware};
 
 // middleware
@@ -125,7 +123,7 @@ async fn plaintext(
 	Ok(context)
 }
 
-// function to create an express port app.
+// function to create an eve-rs app.
 pub fn create_app() -> DemoApp<DefaultContext, DefaultMiddleware<()>, ()>  {
 	DemoApp::<DefaultContext, DefaultMiddleware<()>, ()>::create(default_context_generator, ())
 }
@@ -174,7 +172,7 @@ async fn main() {
 Build the project using `cargo build` command.  
 Run the project using `cargo run` command.
 
-In the above example we have used  `DefaultContext`  as the  `Context` . This means that express-port gives the freedom to implement the `Context` in your own way. For the sake of simplicity we have used  `DefaultContext`.
+In the above example we have used  `DefaultContext`  as the  `Context` . This means that eve-rs gives the freedom to implement the `Context` in your own way. For the sake of simplicity we have used  `DefaultContext`.
 
 Same goes with `DefaultMiddleware`. Here we have used a default implementation. Feel free to implement your own.
 
