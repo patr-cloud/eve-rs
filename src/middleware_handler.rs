@@ -56,6 +56,18 @@ where
 		}
 
 		let mut regex_path = mounted_url
+			.replace('\\', "\\\\")
+			.replace('[', "\\[")
+			.replace(']', "\\]")
+			.replace('?', "\\?")
+			.replace('+', "\\+")
+			.replace('{', "\\{")
+			.replace('}', "\\}")
+			.replace('(', "\\)")
+			.replace('(', "\\)")
+			.replace('|', "\\|")
+			.replace('^', "\\^")
+			.replace('$', "\\$")
 			.replace('.', "\\.") // Specifically, match the dot. This ain't a regex character
 			.replace('*', "([^\\/].)+") // Match anything that's not a /, but at least 1 character
 			.replace("**", "(.)+"); //Match anything
