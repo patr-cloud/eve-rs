@@ -177,3 +177,10 @@ Run the project using `cargo run` command.
 In the above example we have used  `DefaultContext`  as the  `Context` . This means that express-port gives the freedom to implement the `Context` in your own way. For the sake of simplicity we have used  `DefaultContext`.
 
 Same goes with `DefaultMiddleware`. Here we have used a default implementation. Feel free to implement your own.
+
+
+## Credits
+
+This project is heavily inspired by [Thruster](https://github.com/thruster-rs/Thruster). This framework is very similar to Thruster, save for a few small design decisions. While this framework is currently in use in production at our company, if you're looking for something that's a little more mature, you should definitely pick Thruster.
+
+Huge thanks to [@trezm](https://github.com/trezm) for helping me out through the development of this.
