@@ -64,7 +64,7 @@ async fn plaintext(
 
 <H3> Create App </H3>  
 
-Our next step is to create an express port App. The App struct in express-port gives us a `create()`  function, to create an App. The function takes in Two parameters; `context_generator` and  `state`. 
+Our next step is to create an express port App. The App struct in express-port gives us a `create()`  function, to create an App. The function takes in two parameters; `context_generator` and  `state`. 
 
 `context_generator` is a function that is responsible to create a context for our middlewares. It takes in two parameters `Request` and  `state`. State, here could be any configuration we need our app to have. Lets assume that we need our app to have some state, so we will pass the state in the following way.
 
