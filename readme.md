@@ -76,7 +76,6 @@ pub struct State {
 fn context_generator(request : Request, state : &State) {
     let state = state.clone();
     Context::new(request, state);
-    // Context::<Context, Middleware, State>::create()
 }
 ```
 
@@ -97,7 +96,7 @@ pub fn create_app() -> DemoApp<DefaultContext, DefaultMiddleware<()>, ()>  {
 ```
 in the above code, since we do not have a state we pass in `()` in create function.
 
-Once our app is created, we add the midllewares in the scope of the app by using `app.use_middleware()` function.
+Once our app is created, we add the middlewares in the scope of the app by using `app.use_middleware()` function.
 
 ``` rust
  app.use_middleware("/plaintext", &[DefaultMiddleware::new(|context, next| {
