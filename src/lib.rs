@@ -7,6 +7,9 @@ mod middleware;
 mod middleware_handler;
 mod request;
 mod response;
+//mod headers;
+#[cfg(feature = "render")]
+mod renderer;
 
 pub mod default_middlewares;
 
@@ -16,8 +19,11 @@ pub use cookie::{Cookie, CookieOptions, SameSite};
 pub use error::Error;
 pub use http_method::HttpMethod;
 pub use middleware::{DefaultMiddleware, Middleware, NextHandler};
+pub use renderer::RenderEngine;
 pub use request::Request;
 pub use response::Response;
+
+pub use handlebars;
 
 use futures::{channel::oneshot::Receiver, future};
 use hyper::{
