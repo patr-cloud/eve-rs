@@ -73,7 +73,7 @@ pub struct State {
     pub databaseName : String;
 }
 
-fn context_generator(request : Request, state : &State) {
+fn context_generator(request : Request, state : &State) -> Context {
     let state = state.clone();
     Context::new(request, state);
 }
