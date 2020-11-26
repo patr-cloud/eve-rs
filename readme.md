@@ -38,9 +38,9 @@ for our demo application, we will create a single middleware called `plaintext`,
 
 a middleware takes in two parameters, `Context` and `NextHandler`. 
 
-`Context` gives you APIs which gives you more information related to the request. such as getting request body, request status, content type and much more. Since it is a trait (Similar to Interfaces in other programming languages), we get the freedom to define our own context for the application, and on the other hand, the user can use `DefaultContext` provide by express.
+`Context` gives you APIs which gives you more information related to the request. Such as getting request body, request status, content type and much more. Since it is a trait (Similar to Interfaces in other programming languages), we get the freedom to define our own context for the application, and on the other hand, the user can use `DefaultContext` provide by express.
 
-`NextHandler` is the next middleware in the sequence. that is, if the current middleware called finishes processing and does not throw an error, and next middleware is passed, then after executing the current middleware, the next middleware is called.
+`NextHandler` is the next middleware in the sequence. That is, if the current middleware called finishes processing and does not throw an error, and next middleware is passed, then after executing the current middleware, the next middleware is called.
 
 In our example code, we do not have a next middleware to be executed, so we give `_next` as the parameter.
 
@@ -66,7 +66,7 @@ async fn plaintext(
 
 Our next step is to create an express port App. The App struct in express-port gives us a `create()`  function, to create an App. The function takes in Two parameters; `context_generator` and  `state`. 
 
-`context_generator` is a function that is responsible to create a context for our middlewares. It takes in two parameters `Request` and  `state`. state, here could be any configuration we need our app to have. lets assume that we need our app to have some state, so we will pass the state in the following way.
+`context_generator` is a function that is responsible to create a context for our middlewares. It takes in two parameters `Request` and  `state`. State, here could be any configuration we need our app to have. Lets assume that we need our app to have some state, so we will pass the state in the following way.
 
 ```rust
 pub struct State {
@@ -79,7 +79,7 @@ fn context_generator(request : Request, state : &State) -> YourAppContext {
 }
 ```
 
-Since, in our example we are using `DefauleContext`, we can create a context without passing in the state
+Since, in our example we are using `DefauleContext`, we can create a context without passing in the state.
 ``` rust
 fn default_context_generator(request: Request, _ : &()) -> DefaultContext {     
     // default context has no state as an argument.
@@ -87,7 +87,7 @@ fn default_context_generator(request: Request, _ : &()) -> DefaultContext {
 }
 ```
 
-Once we have a context generator, we can go ahead and create an app
+Once we have a context generator, we can go ahead and create an app.
 
 ``` rust
 pub fn create_app() -> DemoApp<DefaultContext, DefaultMiddleware<()>, ()>  {
@@ -153,7 +153,7 @@ async fn main() {
     })]);
     
 
-    // assuign port number.
+    // assign port number.
     let port = 8080;
 
     log::info!("Listening for connections on 127.0.0.1:{}", port);
@@ -161,9 +161,9 @@ async fn main() {
 }
 
 ```
-build the project using `cargo build` command.  
-run the project using `cargo run` command.
+Build the project using `cargo build` command.  
+Run the project using `cargo run` command.
 
-In the above example we have used  `DefaultContext`  as the  `Context` . This means that express-port gives the freedom to Implement the `Context` in your own way. for the sake of simplicity we have used  `DefaultContext`.
+In the above example we have used  `DefaultContext`  as the  `Context` . This means that express-port gives the freedom to Implement the `Context` in your own way. For the sake of simplicity we have used  `DefaultContext`.
 
 Same goes with `DefaultMiddleware`. here we have used the already implemented middleware.
