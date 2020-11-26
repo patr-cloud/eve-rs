@@ -36,27 +36,78 @@ Just like in `express` framework, a middleware is basically a function that has 
 
 for our demo application, we will create a single middleware called `plaintext`, which will print out a plain text on a get request.
 
-a middleware takes in two parameters, `context` and `NextHandler`. 
+a middleware takes in two parameters, `Context` and `NextHandler`. 
 
-`Context` gives you APIs which gives you more information related to the request. such as getting request body, request status, content type and much more. Since it is a trait (Similar to Interfaces in other programming languages), we get the freedom to define our own context for the application, and on the other hand, the user can use `DefauleContext` provide by express.
+`Context` gives you APIs which gives you more information related to the request. such as getting request body, request status, content type and much more. Since it is a trait (Similar to Interfaces in other programming languages), we get the freedom to define our own context for the application, and on the other hand, the user can use `DefaultContext` provide by express.
 
-`NextHandler` is the next middleware in the sequence. that is if the current middleware called finishes processing and does not throw an error, and next middleware is passed, then after executing the current middleware, the next middleware is called.
+`NextHandler` is the next middleware in the sequence. that is, if the current middleware called finishes processing and does not throw an error, and next middleware is passed, then after executing the current middleware, the next middleware is called.
 
-In our example code, we do not have a next middleware to be executed, so we give `_` as the parameter.
+In our example code, we do not have a next middleware to be executed, so we give `_next` as the parameter.
 
 ```rust 
 async fn plaintext(
     mut context: DefaultContext,
-     _: NextHandler<DefaultContext>
+    _next: NextHandler<DefaultContext>
     ) -> Result<DefaultContext, Error<DefaultContext>> {
 
     let val = "Hello, World!";
     context.body(val);
     
+    /**
+    Use this if your code uses a next handler.
+    let response = next(context).await;
+    return response;
+    */
     Ok(context)
 }
 ```
 
+<H3> Create App </H3>  
+
+Our next step is to create an express port App. The App struct in express-port gives us a `create()`  function, to create an App. The function takes in Two parameters; `context_generator` and  `state`. 
+
+`context_generator` is a function that is responsible to create a context for our middlewares. It takes in two parameters `Request` and  `state`. state, here could be any configuration we need our app to have. lets assume that we need our app to have some state, so we will pass the state in the following way.
+
+```rust
+pub struct State {
+    pub databaseName : String;
+}
+
+fn context_generator(request : Request, state : &State) {
+    let state = state.clone();
+    Context::new(request, state);
+    // Context::<Context, Middleware, State>::create()
+}
+```
+
+Since, in our example we are using `DefauleContext`, we can create a context without passing in the state
+``` rust
+fn default_context_generator(request: Request, _ : &()) -> DefaultContext {     
+    // default context has no state as an argument.
+	DefaultContext::new(request)
+}
+```
+
+Once we have a context generator, we can go ahead and create an app
+
+``` rust
+pub fn create_app() -> DemoApp<DefaultContext, DefaultMiddleware<()>, ()>  {
+    DemoApp::<DefaultContext, DefaultMiddleware<()>, ()>::create(default_context_generator, ())
+}
+```
+in the above code, since we do not have a state we pass in `()` in create function.
+
+Once our app is created, we add the midllewares in the scope of the app by using `app.use_middleware()` function.
+
+``` rust
+ app.use_middleware("/plaintext", &[DefaultMiddleware::new(|context, next| {
+        Box::pin(async move {
+            plaintext(context, next).await 
+        })
+    })])
+```
+
+Below is how our code will look by combining all the above explained methods.
 
 ``` rust
 
@@ -102,15 +153,6 @@ async fn main() {
         })
     })]);
     
-
-    
-    // define an endpoint and the function/middleware it will execute at that endpoint.
-    app.get("/plaintext", &[DefaultMiddleware::new(|context, next| {
-        Box::pin(async move {
-            println!("Route: {}", context.get_full_url());
-            plaintext(context, next).await 
-        })
-    })]);
 
     // assuign port number.
     let port = 8080;
