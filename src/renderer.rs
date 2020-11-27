@@ -18,7 +18,7 @@ pub trait RenderEngine: Context {
 		TParams: Serialize,
 	{
 		let rendered = self.get_register().render(template_name, data)?;
-		self.body(&rendered);
+		self.content_type("text/html").body(&rendered);
 		Ok(self)
 	}
 }
