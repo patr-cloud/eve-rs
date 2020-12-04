@@ -25,7 +25,7 @@ pub use response::Response;
 
 pub use handlebars;
 
-use futures::{channel::oneshot::Receiver, future};
+use futures::Future;
 use hyper::{
 	server::conn::AddrStream,
 	service::{make_service_fn, service_fn},
@@ -37,14 +37,15 @@ use hyper::{
 };
 use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 
-pub async fn listen<TContext, TMiddleware, TState>(
+pub async fn listen<TContext, TMiddleware, TState, TShutdownSignal>(
 	app: App<TContext, TMiddleware, TState>,
 	bind_addr: ([u8; 4], u16),
-	shutdown_signal: Option<Receiver<()>>,
+	shutdown_signal: Option<TShutdownSignal>,
 ) where
 	TContext: 'static + Context + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 	TState: 'static + Send + Sync,
+	TShutdownSignal: Future<Output = ()>,
 {
 	let bind_addr = SocketAddr::from(bind_addr);
 
@@ -104,12 +105,7 @@ pub async fn listen<TContext, TMiddleware, TState>(
 
 		if let Some(shutdown_signal) = shutdown_signal {
 			server
-				.with_graceful_shutdown(async {
-					if let Err(_) = shutdown_signal.await {
-						// TODO expose this error to the user
-						future::pending::<()>().await;
-					}
-				})
+				.with_graceful_shutdown(shutdown_signal)
 				.await
 				.unwrap();
 		} else {
