@@ -66,7 +66,7 @@ impl Request {
 							Some((key, value))
 						}
 					})
-					.collect::<HashMap<String, String>>()
+					.collect()
 			} else {
 				HashMap::new()
 			},
@@ -228,21 +228,26 @@ impl Request {
 	}
 }
 
+#[cfg(debug_assertions)]
 impl Debug for Request {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-		if cfg!(debug_assertions) {
-			f.debug_struct("Request")
-				.field("body", &self.body)
-				.field("method", &self.method)
-				.field("path", &self.get_path())
-				.field("version", &self.version)
-				.field("headers", &self.headers)
-				.field("query", &self.query)
-				.field("params", &self.params)
-				.field("cookies", &self.cookies)
-				.finish()
-		} else {
-			write!(f, "[Request {} {}]", self.method, self.get_path())
-		}
+		f.debug_struct("Request")
+			.field("socket_addr", &self.socket_addr)
+			.field("body", &self.body)
+			.field("method", &self.method)
+			.field("uri", &self.uri)
+			.field("version", &self.version)
+			.field("headers", &self.headers)
+			.field("query", &self.query)
+			.field("params", &self.params)
+			.field("cookies", &self.cookies)
+			.finish()
+	}
+}
+
+#[cfg(not(debug_assertions))]
+impl Debug for Request {
+	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+		write!(f, "[Request {} {}]", self.method, self.get_path())
 	}
 }
