@@ -1,7 +1,7 @@
 // file that implements multipart.
-use crate::{context::Context, error::Error};
+use crate::{context::Context};
 
-use std::{fmt::Debug, Error};
+use std::{fmt::Debug};
 use hyper::{header::CONTENT_TYPE, Body};
 use multer::Multipart;
 
@@ -12,7 +12,7 @@ use multer::Multipart;
 pub async fn handle_multipart_request<TContext>(
 	mut context : TContext,
 	destination : &str
-) -> Result<TContext, Error<TContext>>
+) -> Result<(), &'static str>
 where
 TContext: Context + Debug + Send + Sync
 {
@@ -21,12 +21,12 @@ TContext: Context + Debug + Send + Sync
 	//validate content type "multipart/form-data"
 	let content_type = request.get_content_type();
 	if !is_multipart_request(content_type) {
-		// todo return from here
+		//return from here
+		return Err("not a multipart request.");
 	}
 
 	//get hyper request
 	let hyper_request = request.get_hyper_request();
-	
 	let boundary = hyper_request
 		.headers()
 		.get(CONTENT_TYPE)
@@ -36,10 +36,9 @@ TContext: Context + Debug + Send + Sync
 	//since content type is already checked, boundry will not be null.
 	//call request processer and return back response.
 	if let Err(err) = process_multipart(boundary.unwrap(), hyper_request.into_body(), destination).await {
-			//return server error.
+		return Err("Error occured while parsing the multipart request.");
 	}
-	// return success on processing
-	Ok(context)
+	Ok(())
 }
 
 
