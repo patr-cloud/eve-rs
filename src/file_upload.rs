@@ -1,20 +1,20 @@
 // file that implements multipart.
-use crate::{context::Context};
+use crate::context::Context;
 
-use std::{fmt::Debug};
 use hyper::{header::CONTENT_TYPE, Body};
 use multer::Multipart;
+use std::fmt::Debug;
 
 ///function to parse incoming request for Multipart content type
 ///takes in 2 parameters
 ///1) context
 ///2) destination: path to store the incoming file.
 pub async fn handle_multipart_request<TContext>(
-	mut context : TContext,
-	destination : &str
+	mut context: TContext,
+	destination: &str,
 ) -> Result<(), &'static str>
 where
-TContext: Context + Debug + Send + Sync
+	TContext: Context + Debug + Send + Sync,
 {
 	let request = context.get_request();
 
@@ -35,15 +35,16 @@ TContext: Context + Debug + Send + Sync
 
 	//since content type is already checked, boundry will not be null.
 	//call request processer and return back response.
-	if let Err(err) = process_multipart(boundary.unwrap(), hyper_request.into_body(), destination).await {
+	if let Err(err) =
+		process_multipart(boundary.unwrap(), hyper_request.into_body(), destination).await
+	{
 		return Err("Error occured while parsing the multipart request.");
 	}
 	Ok(())
 }
 
-
 // function to process multipart data
-async fn process_multipart(boundary : String, body : Body, destination : &str) -> multer::Result<()> {
+async fn process_multipart(boundary: String, body: Body, destination: &str) -> multer::Result<()> {
 	// create multipart obj
 	let multipart = Multipart::new(body, boundary);
 
@@ -57,16 +58,17 @@ async fn process_multipart(boundary : String, body : Body, destination : &str) -
 		// store the files at destination dir.
 
 		// for testing only
-		println!("Name {:?}, FileName: {:?}, Content-Type: {:?}", name, file_name, content_type);
-
+		println!(
+			"Name {:?}, FileName: {:?}, Content-Type: {:?}",
+			name, file_name, content_type
+		);
 	}
 	Ok(())
 }
 
-
 // helper function.
 // function to validate content type.
-fn is_multipart_request(content_type : String) -> bool {
+fn is_multipart_request(content_type: String) -> bool {
 	if content_type == "multipart/form-data" {
 		return true;
 	}
