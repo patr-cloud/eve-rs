@@ -5,6 +5,7 @@ use std::{
 	fmt::{Debug, Formatter, Result as FmtResult},
 	net::{IpAddr, SocketAddr},
 	str::{self, Utf8Error},
+	rc::Rc,
 };
 
 #[derive(Clone)]
@@ -18,6 +19,7 @@ pub struct Request {
 	pub(crate) query: HashMap<String, String>,
 	pub(crate) params: HashMap<String, String>,
 	pub(crate) cookies: Vec<Cookie>,
+	pub(crate) hyper_request : Rc<HyperRequest<Body>>, // reference counter since HyperRequest does not implements Clone. 
 }
 
 impl Request {
@@ -39,6 +41,10 @@ impl Request {
 				headers.insert(key.to_string(), vec![value]);
 			}
 		});
+
+		// create Reference Counted "hyper_request".
+		let hyper_request_rc : Rc<HyperRequest<Body>> = Rc::new(req);
+
 		Request {
 			socket_addr,
 			body: body::to_bytes(body).await.unwrap().to_vec(),
@@ -72,6 +78,7 @@ impl Request {
 			},
 			params: HashMap::new(),
 			cookies: vec![],
+			hyper_request: Rc::clone(&hyper_request_rc),
 		}
 	}
 
@@ -137,6 +144,7 @@ impl Request {
 		)
 	}
 
+	// how is this working?
 	pub fn get_content_type(&self) -> String {
 		let c_type = self
 			.get_header("Content-Type")

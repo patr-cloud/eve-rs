@@ -12,6 +12,7 @@ mod response;
 mod renderer;
 
 pub mod default_middlewares;
+pub mod file_upload;
 
 pub use app::App;
 pub use context::{default_context_generator, Context, DefaultContext};
