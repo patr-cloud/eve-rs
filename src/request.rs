@@ -82,6 +82,12 @@ impl Request {
 		}
 	}
 
+	//getter for hyper request
+
+	pub fn get_hyper_request(&self) -> Rc<HyperRequest<Body>> {
+		&self.hyper_request;
+	}
+
 	pub fn get_body_bytes(&self) -> &[u8] {
 		&self.body
 	}
