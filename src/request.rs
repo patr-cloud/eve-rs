@@ -19,7 +19,7 @@ pub struct Request {
 	pub(crate) query: HashMap<String, String>,
 	pub(crate) params: HashMap<String, String>,
 	pub(crate) cookies: Vec<Cookie>,
-	pub(crate) hyper_request : Rc<HyperRequest<Body>>, // reference counter since HyperRequest does not implements Clone. 
+	pub(crate) hyper_request : Rc<HyperRequest<Body>>, // reference counter since HyperRequest does not implement Clone
 }
 
 impl Request {

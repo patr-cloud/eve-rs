@@ -1,60 +1,76 @@
 // file that implements multipart.
-use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod,
-context::Context, error::Error};
-use bytes::Bytes;
+use crate::{context::Context, error::Error};
 
-use std::{convert::Infallible, net::SocketAddr, fmt::Debug};
-use hyper::http::request;
+use std::{fmt::Debug, Error};
+use hyper::{header::CONTENT_TYPE, Body};
 use multer::Multipart;
-use futures::stream::once;
-use futures::stream::Stream;
 
-// function to parse incoming request for Multipart content type
-
-async fn handle_multipart_request<TContext>(mut context : TContext
+///function to parse incoming request for Multipart content type
+///takes in 2 parameters
+///1) context
+///2) destination: path to store the incoming file.
+pub async fn handle_multipart_request<TContext>(
+	mut context : TContext,
+	destination : &str
 ) -> Result<TContext, Error<TContext>>
 where
 TContext: Context + Debug + Send + Sync
 {
-	//get request from context
 	let request = context.get_request();
 
-	// extract multipart from boundry
-	let boundry_string = request
-		.get_content_type();
-
-	let boundry = multer::parse_boundary(boundry_string).ok();
-
-	// check if content type is not "multipart/form-data"
-
-	if boundry.is_none() {
-		// TODO: send bad request.
+	//validate content type "multipart/form-data"
+	let content_type = request.get_content_type();
+	if !is_multipart_request(content_type) {
+		// todo return from here
 	}
 
-	// check for error while parsing.
-	// if let Err(err) = process_multipart(request)
+	//get hyper request
+	let hyper_request = request.get_hyper_request();
+	
+	let boundary = hyper_request
+		.headers()
+		.get(CONTENT_TYPE)
+		.and_then(|ct| ct.to_str().ok())
+		.and_then(|ct| multer::parse_boundary(ct).ok());
 
+	//since content type is already checked, boundry will not be null.
+	//call request processer and return back response.
+	if let Err(err) = process_multipart(boundary.unwrap(), hyper_request.into_body(), destination).await {
+			//return server error.
+	}
+	// return success on processing
 	Ok(context)
 }
 
 
 // function to process multipart data
-async fn process_multipart(request : Request, boundry : String) -> multer::Result<()> {
+async fn process_multipart(boundary : String, body : Body, destination : &str) -> multer::Result<()> {
+	// create multipart obj
+	let multipart = Multipart::new(body, boundary);
 
+	// iterate over the fields in multipart request.
 	// get request body
-	let body = request.get_body();
+	while let Some(mut field) = multipart.next_field().await? {
+		let name = field.name();
+		let file_name = field.file_name();
+		let content_type = field.content_type();
 
-	let data = "--X-BOUNDARY\r\nContent-Disposition: form-data; name=\"my_text_field\"\r\n\r\nabcd\r\n--X-BOUNDARY--\r\n";
-	let temp_body_stream = once(async move {Result::<Bytes, Infallible>::Ok(Bytes::from(data))});
-	
-	let mut multipart = Multipart::new(temp_body_stream, boundry);
+		// store the files at destination dir.
 
-	
+		// for testing only
+		println!("Name {:?}, FileName: {:?}, Content-Type: {:?}", name, file_name, content_type);
 
-
-
-
-
-
+	}
 	Ok(())
+}
+
+
+// helper function.
+// function to validate content type.
+fn is_multipart_request(content_type : String) -> bool {
+	if content_type == "multipart/form-data" {
+		return true;
+	}
+
+	false
 }
