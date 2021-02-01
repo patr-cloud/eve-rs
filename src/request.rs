@@ -1,5 +1,5 @@
 use crate::{cookie::Cookie, HttpMethod};
-use hyper::{body, Body, Request as HyperRequest, Uri, Version};
+use hyper::{body, Body, Request as HyperRequestInternal, Uri, Version};
 use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
@@ -7,7 +7,8 @@ use std::{
 	str::{self, Utf8Error},
 };
 
-#[derive(Clone)]
+pub type HyperRequest = HyperRequestInternal<Body>;
+
 pub struct Request {
 	pub(crate) socket_addr: SocketAddr,
 	pub(crate) body: Vec<u8>,
@@ -18,11 +19,12 @@ pub struct Request {
 	pub(crate) query: HashMap<String, String>,
 	pub(crate) params: HashMap<String, String>,
 	pub(crate) cookies: Vec<Cookie>,
+	pub(crate) hyper_request: HyperRequest,
 }
 
 impl Request {
-	pub async fn from_hyper(socket_addr: SocketAddr, req: HyperRequest<Body>) -> Self {
-		let (parts, body) = req.into_parts();
+	pub async fn from_hyper(socket_addr: SocketAddr, req: HyperRequest) -> Self {
+		let (parts, hyper_body) = req.into_parts();
 		let mut headers = HashMap::<String, Vec<String>>::new();
 		parts.headers.iter().for_each(|(key, value)| {
 			let key = key.to_string();
@@ -39,10 +41,11 @@ impl Request {
 				headers.insert(key.to_string(), vec![value]);
 			}
 		});
+		let body = body::to_bytes(hyper_body).await.unwrap().to_vec();
 		Request {
 			socket_addr,
-			body: body::to_bytes(body).await.unwrap().to_vec(),
-			method: HttpMethod::from(parts.method),
+			body: body.clone(),
+			method: HttpMethod::from(parts.method.clone()),
 			uri: parts.uri.clone(),
 			version: match parts.version {
 				Version::HTTP_09 => (0, 9),
@@ -72,6 +75,7 @@ impl Request {
 			},
 			params: HashMap::new(),
 			cookies: vec![],
+			hyper_request: HyperRequest::from_parts(parts, Body::from(body)),
 		}
 	}
 
@@ -225,6 +229,14 @@ impl Request {
 
 	pub fn get_cookie(&self, name: &str) -> Option<&Cookie> {
 		self.cookies.iter().find(|cookie| cookie.key == name)
+	}
+
+	pub fn get_hyper_request(&self) -> &HyperRequest {
+		&self.hyper_request
+	}
+
+	pub fn get_hyper_request_mut(&mut self) -> &mut HyperRequest {
+		&mut self.hyper_request
 	}
 }
 

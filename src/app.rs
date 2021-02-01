@@ -63,7 +63,6 @@ where
 	})
 }
 
-#[derive(Clone)]
 pub struct App<TContext, TMiddleware, TState>
 where
 	TContext: Context + Debug + Send + Sync,
@@ -363,5 +362,30 @@ where
 {
 	fn default() -> Self {
 		Self::create(|_, _| TContext::default(), TState::default())
+	}
+}
+
+impl<TContext, TMiddleware, TState> Clone for App<TContext, TMiddleware, TState>
+where
+	TContext: 'static + Context + Debug + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+	TState: Clone + Send + Sync,
+{
+	fn clone(&self) -> Self {
+		Self {
+			context_generator: self.context_generator,
+			state: self.state.clone(),
+			error_handler: self.error_handler,
+
+			get_stack: self.get_stack.clone(),
+			post_stack: self.post_stack.clone(),
+			put_stack: self.put_stack.clone(),
+			delete_stack: self.delete_stack.clone(),
+			head_stack: self.head_stack.clone(),
+			options_stack: self.options_stack.clone(),
+			connect_stack: self.connect_stack.clone(),
+			patch_stack: self.patch_stack.clone(),
+			trace_stack: self.trace_stack.clone(),
+		}
 	}
 }
