@@ -1,17 +1,17 @@
 use crate::{cookie::Cookie, HttpMethod};
-use hyper::{body, Body, Request as HyperRequestInternal, Uri, Version};
+use hyper::{body::HttpBody, Body, Request as HyperRequestInternal, Uri, Version};
 use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
 	net::{IpAddr, SocketAddr},
-	str::{self, Utf8Error},
+	str,
 };
 
 pub type HyperRequest = HyperRequestInternal<Body>;
 
 pub struct Request {
 	pub(crate) socket_addr: SocketAddr,
-	pub(crate) body: Vec<u8>,
+	pub(crate) body: Option<Vec<u8>>,
 	pub(crate) method: HttpMethod,
 	pub(crate) uri: Uri,
 	pub(crate) version: (u8, u8),
@@ -20,6 +20,7 @@ pub struct Request {
 	pub(crate) params: HashMap<String, String>,
 	pub(crate) cookies: Vec<Cookie>,
 	pub(crate) hyper_request: HyperRequest,
+	pub(crate) max_request_body: usize,
 }
 
 impl Request {
@@ -41,10 +42,9 @@ impl Request {
 				headers.insert(key.to_string(), vec![value]);
 			}
 		});
-		let body = body::to_bytes(hyper_body).await.unwrap().to_vec();
 		Request {
 			socket_addr,
-			body: body.clone(),
+			body: None,
 			method: HttpMethod::from(parts.method.clone()),
 			uri: parts.uri.clone(),
 			version: match parts.version {
@@ -57,34 +57,45 @@ impl Request {
 			},
 			headers: headers.clone(),
 			query: if let Some(query) = parts.uri.query() {
-				query
-					.split('&')
-					.filter_map(|kv| {
-						if !kv.contains('=') {
-							None
-						} else {
-							let mut items = kv.split('=').map(String::from);
-							let key = items.next()?;
-							let value = items.next()?;
-							Some((key, value))
-						}
-					})
-					.collect()
+				serde_urlencoded::from_str(query).unwrap_or_default()
 			} else {
 				HashMap::new()
 			},
 			params: HashMap::new(),
 			cookies: vec![],
-			hyper_request: HyperRequest::from_parts(parts, Body::from(body)),
+			hyper_request: HyperRequest::from_parts(parts, hyper_body),
+			max_request_body: usize::MAX,
 		}
 	}
 
-	pub fn get_body_bytes(&self) -> &[u8] {
-		&self.body
+	pub async fn get_body_bytes(&mut self) -> Option<Vec<u8>> {
+		if let Some(body) = &self.body {
+			Some(body.clone())
+		} else {
+			let mut body = vec![];
+			while let Some(data) = self.hyper_request.data().await {
+				if data.is_err() {
+					return None;
+				}
+				body.append(&mut data.unwrap().to_vec());
+				if body.len() >= self.max_request_body {
+					return None;
+				}
+			}
+
+			self.body = Some(body.clone());
+			Some(body)
+		}
 	}
 
-	pub fn get_body(&self) -> Result<String, Utf8Error> {
-		Ok(str::from_utf8(&self.body)?.to_string())
+	pub async fn get_body(&mut self) -> Option<String> {
+		let body_bytes = self.get_body_bytes().await?;
+		let result = str::from_utf8(&body_bytes);
+		if result.is_err() {
+			return None;
+		}
+		let result = result.unwrap();
+		Some(result.to_string())
 	}
 
 	pub fn get_method(&self) -> &HttpMethod {
@@ -99,7 +110,7 @@ impl Request {
 				}
 			}
 		}
-		self.body.len() as u128
+		self.body.as_ref().unwrap().len() as u128
 	}
 
 	pub fn get_path(&self) -> String {
@@ -237,6 +248,14 @@ impl Request {
 
 	pub fn get_hyper_request_mut(&mut self) -> &mut HyperRequest {
 		&mut self.hyper_request
+	}
+
+	pub fn set_max_body_size(&mut self, max_size: usize) {
+		self.max_request_body = max_size;
+	}
+
+	pub fn get_max_body_size(&self) -> usize {
+		self.max_request_body
 	}
 }
 

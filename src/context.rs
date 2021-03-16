@@ -1,20 +1,18 @@
 use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
 
 use serde_json::Value;
-use std::{
-	net::IpAddr,
-	str::{self, Utf8Error},
-};
+use std::{net::IpAddr, str};
 
-pub trait Context {
+#[async_trait::async_trait]
+pub trait Context: Send {
 	fn get_request(&self) -> &Request;
 	fn get_request_mut(&mut self) -> &mut Request;
 	fn get_response(&self) -> &Response;
 	fn take_response(self) -> Response;
 	fn get_response_mut(&mut self) -> &mut Response;
 
-	fn get_body(&self) -> Result<String, Utf8Error> {
-		self.get_request().get_body()
+	async fn get_body(&mut self) -> Option<String> {
+		self.get_request_mut().get_body().await
 	}
 	fn json(&mut self, body: Value) -> &mut Self {
 		self.content_type("application/json")
