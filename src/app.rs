@@ -24,7 +24,7 @@ fn chained_run<TContext, TMiddleware>(
 	mut context: TContext,
 	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware>>>,
 	i: usize,
-) -> Pin<Box<dyn Future<Output = Result<TContext, Error<TContext>>> + Send>>
+) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
@@ -319,7 +319,7 @@ where
 			}));
 	}
 
-	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error<TContext>> {
+	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error> {
 		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
 		chained_run(context, Arc::new(stack), 0).await
 	}

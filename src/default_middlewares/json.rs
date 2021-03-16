@@ -1,8 +1,8 @@
-use crate::{Context, DefaultMiddleware, Error};
+use crate::{AsError, Context, DefaultMiddleware, Error};
 use serde_json::Value;
 use std::fmt::Debug;
 
-pub fn parser<TContext>(context: &TContext) -> Result<Option<Value>, Error<TContext>>
+pub fn parser<TContext>(context: &TContext) -> Result<Option<Value>, Error>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
 {
@@ -11,7 +11,9 @@ where
 			.get_request()
 			.get_body()
 			.unwrap_or_else(|_| "None".to_string());
-		let value = serde_json::from_str(&body)?;
+		let value = serde_json::from_str(&body)
+			.status(400)
+			.body("Bad request")?;
 		Ok(Some(value))
 	} else {
 		Ok(None)
