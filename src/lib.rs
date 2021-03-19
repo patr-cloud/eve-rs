@@ -1,5 +1,6 @@
 mod app;
 mod context;
+#[cfg(feature = "cookies")]
 mod cookie;
 mod error;
 mod http_method;
@@ -7,7 +8,8 @@ mod middleware;
 mod middleware_handler;
 mod request;
 mod response;
-//mod headers;
+#[cfg(feature = "file-uploader")]
+mod file_uploader;
 #[cfg(feature = "render")]
 mod renderer;
 
@@ -15,6 +17,7 @@ pub mod default_middlewares;
 
 pub use app::App;
 pub use context::{default_context_generator, Context, DefaultContext};
+#[cfg(feature = "cookies")]
 pub use cookie::{Cookie, CookieOptions, SameSite};
 pub use error::Error;
 pub use http_method::HttpMethod;
