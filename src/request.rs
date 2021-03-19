@@ -1,13 +1,15 @@
-use crate::{cookie::Cookie, HttpMethod};
+use crate::{cookie::Cookie, file_uploader::Field, HttpMethod};
 use hyper::{body::HttpBody, Body, Request as HyperRequestInternal, Uri, Version};
 use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
 	net::{IpAddr, SocketAddr},
 	str,
+	sync::Arc,
 };
+use tokio::sync::Mutex;
 
-pub type HyperRequest = HyperRequestInternal<Body>;
+pub type HyperRequest = Arc<Mutex<HyperRequestInternal<Body>>>;
 
 pub struct Request {
 	pub(crate) socket_addr: SocketAddr,
@@ -24,7 +26,7 @@ pub struct Request {
 }
 
 impl Request {
-	pub async fn from_hyper(socket_addr: SocketAddr, req: HyperRequest) -> Self {
+	pub async fn from_hyper(socket_addr: SocketAddr, req: HyperRequestInternal<Body>) -> Self {
 		let (parts, hyper_body) = req.into_parts();
 		let mut headers = HashMap::<String, Vec<String>>::new();
 		parts.headers.iter().for_each(|(key, value)| {
@@ -63,17 +65,17 @@ impl Request {
 			},
 			params: HashMap::new(),
 			cookies: vec![],
-			hyper_request: HyperRequest::from_parts(parts, hyper_body),
+			hyper_request: Arc::new(Mutex::new(HyperRequestInternal::from_parts(
+				parts, hyper_body,
+			))),
 			max_request_body: usize::MAX,
 		}
 	}
 
-	pub async fn get_body_bytes(&mut self) -> Option<Vec<u8>> {
-		if let Some(body) = &self.body {
-			Some(body.clone())
-		} else {
+	pub async fn get_body_bytes(&mut self) -> Option<&[u8]> {
+		if self.body.is_none() {
 			let mut body = vec![];
-			while let Some(data) = self.hyper_request.data().await {
+			while let Some(data) = self.hyper_request.lock().await.data().await {
 				if data.is_err() {
 					return None;
 				}
@@ -83,9 +85,10 @@ impl Request {
 				}
 			}
 
-			self.body = Some(body.clone());
-			Some(body)
+			self.body = Some(body);
 		}
+
+		self.body.as_ref().map(|body| body.as_ref())
 	}
 
 	pub async fn get_body(&mut self) -> Option<String> {
@@ -110,7 +113,7 @@ impl Request {
 				}
 			}
 		}
-		self.body.as_ref().unwrap().len() as u128
+		0
 	}
 
 	pub fn get_path(&self) -> String {

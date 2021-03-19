@@ -8,7 +8,6 @@ mod middleware;
 mod middleware_handler;
 mod request;
 mod response;
-//mod headers;
 #[cfg(feature = "file-uploader")]
 mod file_uploader;
 #[cfg(feature = "render")]
