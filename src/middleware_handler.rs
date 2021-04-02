@@ -51,7 +51,7 @@ where
 
 		// if there's a trailing /, remove it
 		if mounted_url.ends_with('/') {
-			mounted_url = path[..(path.len() - 1)].to_owned();
+			mounted_url = path[..(path.len() - 1)].to_string();
 		}
 
 		// If there's nothing left, set the middleware to /
