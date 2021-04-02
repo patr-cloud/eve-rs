@@ -35,7 +35,11 @@ where
 	TContext: Context + Debug + Send + Sync,
 	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
 {
-	pub(crate) fn new(path: &str, handler: TMiddleware, is_endpoint: bool) -> Self {
+	pub(crate) fn new(
+		path: &str,
+		handler: TMiddleware,
+		is_endpoint: bool,
+	) -> Self {
 		let mut mounted_url = path.to_string();
 
 		// Make sure it always begins with a /

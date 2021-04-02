@@ -71,7 +71,10 @@ impl From<Method> for HttpMethod {
 			Method::CONNECT => HttpMethod::Connect,
 			Method::PATCH => HttpMethod::Patch,
 			Method::TRACE => HttpMethod::Trace,
-			method => panic!("Could not recognise suitable HTTP method for {}", method),
+			method => panic!(
+				"Could not recognise suitable HTTP method for {}",
+				method
+			),
 		}
 	}
 }

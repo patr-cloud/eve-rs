@@ -44,16 +44,27 @@ where
 								.unwrap_or(0)
 						}
 						"domain" => {
-							options.domain = option_key_pair.next().unwrap_or("").to_owned()
+							options.domain =
+								option_key_pair.next().unwrap_or("").to_owned()
 						}
-						"path" => options.path = option_key_pair.next().unwrap_or("").to_owned(),
+						"path" => {
+							options.path =
+								option_key_pair.next().unwrap_or("").to_owned()
+						}
 						"secure" => options.secure = true,
 						"httponly" => options.http_only = true,
 						"samesite" => {
-							if let Some(same_site_value) = option_key_pair.next() {
+							if let Some(same_site_value) =
+								option_key_pair.next()
+							{
 								match same_site_value.to_lowercase().as_ref() {
-									"strict" => options.same_site = Some(SameSite::Strict),
-									"lax" => options.same_site = Some(SameSite::Lax),
+									"strict" => {
+										options.same_site =
+											Some(SameSite::Strict)
+									}
+									"lax" => {
+										options.same_site = Some(SameSite::Lax)
+									}
 									_ => (),
 								};
 							}

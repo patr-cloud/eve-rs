@@ -200,6 +200,9 @@ impl Context for DefaultContext {
 	}
 }
 
-pub fn default_context_generator<TState>(request: Request, _: &TState) -> DefaultContext {
+pub fn default_context_generator<TState>(
+	request: Request,
+	_: &TState,
+) -> DefaultContext {
 	DefaultContext::new(request)
 }

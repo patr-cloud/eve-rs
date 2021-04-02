@@ -45,7 +45,8 @@ where
 			log::warn!("invalid state! ensure you call logger::begin_measuring before calling logger::complete_measuring");
 			return None;
 		}
-		let elapsed_time = Instant::now().duration_since(self.measurer.unwrap());
+		let elapsed_time =
+			Instant::now().duration_since(self.measurer.unwrap());
 
 		if (self.should_skip)(&context) {
 			return None;
@@ -55,9 +56,14 @@ where
 			.match_indices(":req[")
 			.into_iter()
 			.filter_map(|(index, _)| {
-				let header_end_index = self.log_format[index..].chars().position(|c| c == ']')?;
-				let header_name = &self.log_format[(index + 5)..header_end_index];
-				Some((header_name.to_string(), context.get_header(&header_name)?))
+				let header_end_index =
+					self.log_format[index..].chars().position(|c| c == ']')?;
+				let header_name =
+					&self.log_format[(index + 5)..header_end_index];
+				Some((
+					header_name.to_string(),
+					context.get_header(&header_name)?,
+				))
 			})
 			.collect::<Vec<(String, String)>>();
 
@@ -66,8 +72,10 @@ where
 			.match_indices(":res[")
 			.into_iter()
 			.filter_map(|(index, _)| {
-				let header_end_index = self.log_format[index..].chars().position(|c| c == ']')?;
-				let header_name = &self.log_format[(index + 5)..(index + header_end_index)];
+				let header_end_index =
+					self.log_format[index..].chars().position(|c| c == ']')?;
+				let header_name =
+					&self.log_format[(index + 5)..(index + header_end_index)];
 				Some((
 					header_name.to_string(),
 					context.get_response().get_header(&header_name)?,
@@ -94,9 +102,9 @@ where
 			.replace(":method", &context.get_method().to_string())
 			.replace(
 				":referrer",
-				&context
-					.get_header("Referer")
-					.unwrap_or_else(|| context.get_header("Referrer").unwrap_or_else(String::new)),
+				&context.get_header("Referer").unwrap_or_else(|| {
+					context.get_header("Referrer").unwrap_or_else(String::new)
+				}),
 			)
 			.replace(":remote-addr", &context.get_ip().to_string())
 			.replace(
@@ -110,12 +118,27 @@ where
 			.replace(
 				":status",
 				&match context.get_response().get_status() {
-					100..=199 => format!("{}", context.get_response().get_status()).normal(),
-					200..=299 => format!("{}", context.get_response().get_status()).green(),
-					300..=399 => format!("{}", context.get_response().get_status()).cyan(),
-					400..=499 => format!("{}", context.get_response().get_status()).yellow(),
-					500..=599 => format!("{}", context.get_response().get_status()).red(),
-					_ => format!("{}", context.get_response().get_status()).purple(),
+					100..=199 => {
+						format!("{}", context.get_response().get_status())
+							.normal()
+					}
+					200..=299 => {
+						format!("{}", context.get_response().get_status())
+							.green()
+					}
+					300..=399 => {
+						format!("{}", context.get_response().get_status())
+							.cyan()
+					}
+					400..=499 => {
+						format!("{}", context.get_response().get_status())
+							.yellow()
+					}
+					500..=599 => {
+						format!("{}", context.get_response().get_status()).red()
+					}
+					_ => format!("{}", context.get_response().get_status())
+						.purple(),
 				},
 			)
 			.replace(":url", &context.get_path())
@@ -139,7 +162,8 @@ where
 			log_value = log_value.replace(&format!(":res[{}]", key), &value);
 		}
 		for (key, value) in dates {
-			log_value = log_value.replace(&format!(":date[{}]", key), &value.to_string());
+			log_value = log_value
+				.replace(&format!(":date[{}]", key), &value.to_string());
 		}
 
 		Some(log_value)

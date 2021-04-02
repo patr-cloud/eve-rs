@@ -45,10 +45,11 @@ impl CompressionHandler {
 		} else if allowed_encodings.contains(&"deflate") {
 			let data = context.get_response().get_body();
 			let mut output = [];
-			if let Ok(Status::Ok) =
-				self.zlib_compressor
-					.compress(&data, &mut output, FlushCompress::None)
-			{
+			if let Ok(Status::Ok) = self.zlib_compressor.compress(
+				&data,
+				&mut output,
+				FlushCompress::None,
+			) {
 				context
 					.body_bytes(&output)
 					.header("Content-Encoding", "deflate");
