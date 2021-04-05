@@ -23,7 +23,10 @@ pub struct Request {
 }
 
 impl Request {
-	pub async fn from_hyper(socket_addr: SocketAddr, req: HyperRequest) -> Self {
+	pub async fn from_hyper(
+		socket_addr: SocketAddr,
+		req: HyperRequest,
+	) -> Self {
 		let (parts, hyper_body) = req.into_parts();
 		let mut headers = HashMap::<String, Vec<String>>::new();
 		parts.headers.iter().for_each(|(key, value)| {
@@ -57,19 +60,8 @@ impl Request {
 			},
 			headers: headers.clone(),
 			query: if let Some(query) = parts.uri.query() {
-				query
-					.split('&')
-					.filter_map(|kv| {
-						if !kv.contains('=') {
-							None
-						} else {
-							let mut items = kv.split('=').map(String::from);
-							let key = items.next()?;
-							let value = items.next()?;
-							Some((key, value))
-						}
-					})
-					.collect()
+				serde_urlencoded::from_str(query)
+					.unwrap_or_else(|_| HashMap::new())
 			} else {
 				HashMap::new()
 			},
@@ -123,10 +115,9 @@ impl Request {
 	}
 
 	pub fn get_host(&self) -> String {
-		self.uri
-			.host()
-			.map(String::from)
-			.unwrap_or_else(|| self.get_header("host").unwrap_or_else(|| "".to_string()))
+		self.uri.host().map(String::from).unwrap_or_else(|| {
+			self.get_header("host").unwrap_or_else(|| "".to_string())
+		})
 	}
 
 	pub fn get_host_and_port(&self) -> String {
@@ -152,7 +143,11 @@ impl Request {
 		let header = self.get_header("Content-Type")?;
 		let charset_index = header.find("charset=")?;
 		let data = &header[charset_index..];
-		Some(data[(charset_index + 8)..data.find(';').unwrap_or_else(|| data.len())].to_string())
+		Some(
+			data[(charset_index + 8)..
+				data.find(';').unwrap_or_else(|| data.len())]
+				.to_string(),
+		)
 	}
 
 	pub fn get_protocol(&self) -> String {

@@ -57,47 +57,55 @@ pub async fn listen<TContext, TMiddleware, TState, TShutdownSignal>(
 			let remote_addr = conn.remote_addr();
 
 			async move {
-				Ok::<_, HyperError>(service_fn(move |req: HyperRequest<Body>| {
-					let app = app.clone();
-					async move {
-						let request = Request::from_hyper(remote_addr, req).await;
-						let mut context = app.generate_context(request);
-						context.header("Server", "Eve");
+				Ok::<_, HyperError>(service_fn(
+					move |req: HyperRequest<Body>| {
+						let app = app.clone();
+						async move {
+							let request =
+								Request::from_hyper(remote_addr, req).await;
+							let mut context = app.generate_context(request);
+							context.header("Server", "Eve");
 
-						// execute app's middlewares
-						let result = app.resolve(context).await;
-						let response = match result {
-							Ok(context) => context.take_response(),
-							Err(err) => {
-								// return a proper formatted error, if an error handler exists
-								if app.error_handler.is_none() {
-									return Ok::<_, HyperError>(HyperResponse::new(Body::from(
-										err.message,
-									)));
-								} else {
-									let response = Response::new();
-									(app.error_handler.as_ref().unwrap())(response, err.error)
+							// execute app's middlewares
+							let result = app.resolve(context).await;
+							let response = match result {
+								Ok(context) => context.take_response(),
+								Err(err) => {
+									// return a proper formatted error, if an error handler exists
+									if app.error_handler.is_none() {
+										return Ok::<_, HyperError>(
+											HyperResponse::new(Body::from(
+												err.message,
+											)),
+										);
+									} else {
+										let response = Response::new();
+										(app.error_handler.as_ref().unwrap())(
+											response, err.error,
+										)
+									}
+								}
+							};
+
+							let mut hyper_response = HyperResponse::builder();
+
+							// Set the appropriate headers
+							for (key, values) in &response.headers {
+								for value in values {
+									hyper_response =
+										hyper_response.header(key, value);
 								}
 							}
-						};
 
-						let mut hyper_response = HyperResponse::builder();
-
-						// Set the appropriate headers
-						for (key, values) in &response.headers {
-							for value in values {
-								hyper_response = hyper_response.header(key, value);
-							}
+							Ok::<HyperResponse<Body>, HyperError>(
+								hyper_response
+									.status(response.status)
+									.body(Body::from(response.body))
+									.unwrap(),
+							)
 						}
-
-						Ok::<HyperResponse<Body>, HyperError>(
-							hyper_response
-								.status(response.status)
-								.body(Body::from(response.body))
-								.unwrap(),
-						)
-					}
-				}))
+					},
+				))
 			}
 		});
 

@@ -41,7 +41,10 @@ where
 					let var = var.unwrap();
 					let value = captures.name(var);
 					if let Some(value) = value {
-						url_params.insert(var.to_string(), value.as_str().to_string());
+						url_params.insert(
+							var.to_string(),
+							value.as_str().to_string(),
+						);
 					}
 				}
 			}
@@ -49,7 +52,9 @@ where
 			m.handler
 				.run_middleware(
 					context,
-					Box::new(move |context| chained_run(context, nodes.clone(), i + 1)),
+					Box::new(move |context| {
+						chained_run(context, nodes.clone(), i + 1)
+					}),
 				)
 				.await
 		} else {
@@ -90,7 +95,10 @@ where
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
 	TState: Send + Sync,
 {
-	pub fn create(context_generator: ContextGeneratorFn<TContext, TState>, state: TState) -> Self {
+	pub fn create(
+		context_generator: ContextGeneratorFn<TContext, TState>,
+		state: TState,
+	) -> Self {
 		App {
 			context_generator,
 			state,
@@ -122,91 +130,148 @@ where
 
 	pub fn get(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.get_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.get_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 		middlewares.iter().for_each(|handler| {
-			self.trace_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.trace_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 	}
 
 	pub fn post(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.post_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.post_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 	}
 
 	pub fn put(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.put_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.put_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 	}
 
 	pub fn delete(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.delete_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.delete_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 	}
 
 	pub fn head(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.head_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.head_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 	}
 
 	pub fn options(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.options_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.options_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 	}
 
 	pub fn connect(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.connect_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.connect_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 	}
 
 	pub fn patch(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.patch_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.patch_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 	}
 
 	pub fn trace(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.trace_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), true));
+			self.trace_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				true,
+			));
 		});
 	}
 
 	pub fn use_middleware(&mut self, path: &str, middlewares: &[TMiddleware]) {
 		middlewares.iter().for_each(|handler| {
-			self.get_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), false));
-			self.post_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), false));
-			self.put_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), false));
-			self.delete_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), false));
-			self.head_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), false));
-			self.options_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), false));
-			self.connect_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), false));
-			self.patch_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), false));
-			self.trace_stack
-				.push(MiddlewareHandler::new(path, handler.clone(), false));
+			self.get_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				false,
+			));
+			self.post_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				false,
+			));
+			self.put_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				false,
+			));
+			self.delete_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				false,
+			));
+			self.head_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				false,
+			));
+			self.options_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				false,
+			));
+			self.connect_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				false,
+			));
+			self.patch_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				false,
+			));
+			self.trace_stack.push(MiddlewareHandler::new(
+				path,
+				handler.clone(),
+				false,
+			));
 		});
 	}
 
@@ -300,27 +365,33 @@ where
 				)
 			}));
 
-		self.patch_stack
-			.extend(sub_app.patch_stack.into_iter().map(|handler| {
+		self.patch_stack.extend(sub_app.patch_stack.into_iter().map(
+			|handler| {
 				MiddlewareHandler::new(
 					&format!("{}{}", base_path, handler.mounted_url),
 					handler.handler,
 					handler.is_endpoint,
 				)
-			}));
+			},
+		));
 
-		self.trace_stack
-			.extend(sub_app.trace_stack.into_iter().map(|handler| {
+		self.trace_stack.extend(sub_app.trace_stack.into_iter().map(
+			|handler| {
 				MiddlewareHandler::new(
 					&format!("{}{}", base_path, handler.mounted_url),
 					handler.handler,
 					handler.is_endpoint,
 				)
-			}));
+			},
+		));
 	}
 
-	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error<TContext>> {
-		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
+	pub async fn resolve(
+		&self,
+		context: TContext,
+	) -> Result<TContext, Error<TContext>> {
+		let stack =
+			self.get_middleware_stack(context.get_method(), context.get_path());
 		chained_run(context, Arc::new(stack), 0).await
 	}
 
@@ -354,7 +425,8 @@ where
 	}
 }
 
-impl<TContext, TMiddleware, TState> Default for App<TContext, TMiddleware, TState>
+impl<TContext, TMiddleware, TState> Default
+	for App<TContext, TMiddleware, TState>
 where
 	TContext: 'static + Context + Default + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,

@@ -9,7 +9,8 @@ pub struct StaticFileServer {
 
 impl StaticFileServer {
 	pub fn create(folder_path: &str) -> StaticFileServer {
-		let folder_path = if let Some(stripped) = folder_path.strip_suffix('/') {
+		let folder_path = if let Some(stripped) = folder_path.strip_suffix('/')
+		{
 			stripped
 		} else {
 			folder_path
@@ -26,7 +27,8 @@ impl StaticFileServer {
 	where
 		TContext: Context + Debug + Send + Sync,
 	{
-		let file_location = format!("{}{}", self.folder_path, context.get_path());
+		let file_location =
+			format!("{}{}", self.folder_path, context.get_path());
 		if is_file(&file_location).await {
 			let content = fs::read(file_location).await?;
 			context.body_bytes(&content);
