@@ -9,6 +9,7 @@ use crate::{
 };
 
 use std::{
+	array::IntoIter,
 	collections::HashMap,
 	error::Error as StdError,
 	fmt::Debug,
@@ -24,7 +25,7 @@ fn chained_run<TContext, TMiddleware>(
 	mut context: TContext,
 	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware>>>,
 	i: usize,
-) -> Pin<Box<dyn Future<Output = Result<TContext, Error<TContext>>> + Send>>
+) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
 	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
@@ -128,105 +129,116 @@ where
 		self.error_handler = None;
 	}
 
-	pub fn get(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
+	pub fn get<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
 				handler.clone(),
 				true,
 			));
-		});
-		middlewares.iter().for_each(|handler| {
-			self.trace_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				true,
-			));
+			self.trace_stack
+				.push(MiddlewareHandler::new(path, handler, true));
 		});
 	}
 
-	pub fn post(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
-			self.post_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				true,
-			));
+	pub fn post<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
+			self.post_stack
+				.push(MiddlewareHandler::new(path, handler, true));
 		});
 	}
 
-	pub fn put(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
-			self.put_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				true,
-			));
+	pub fn put<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
+			self.put_stack
+				.push(MiddlewareHandler::new(path, handler, true));
 		});
 	}
 
-	pub fn delete(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
-			self.delete_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				true,
-			));
+	pub fn delete<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
+			self.delete_stack
+				.push(MiddlewareHandler::new(path, handler, true));
 		});
 	}
 
-	pub fn head(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
-			self.head_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				true,
-			));
+	pub fn head<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
+			self.head_stack
+				.push(MiddlewareHandler::new(path, handler, true));
 		});
 	}
 
-	pub fn options(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
-			self.options_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				true,
-			));
+	pub fn options<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
+			self.options_stack
+				.push(MiddlewareHandler::new(path, handler, true));
 		});
 	}
 
-	pub fn connect(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
-			self.connect_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				true,
-			));
+	pub fn connect<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
+			self.connect_stack
+				.push(MiddlewareHandler::new(path, handler, true));
 		});
 	}
 
-	pub fn patch(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
-			self.patch_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				true,
-			));
+	pub fn patch<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
+			self.patch_stack
+				.push(MiddlewareHandler::new(path, handler, true));
 		});
 	}
 
-	pub fn trace(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
-			self.trace_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				true,
-			));
+	pub fn trace<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
+			self.trace_stack
+				.push(MiddlewareHandler::new(path, handler, true));
 		});
 	}
 
-	pub fn use_middleware(&mut self, path: &str, middlewares: &[TMiddleware]) {
-		middlewares.iter().for_each(|handler| {
+	pub fn use_middleware<const MIDDLEWARE_LENGTH: usize>(
+		&mut self,
+		path: &str,
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
+		IntoIter::new(middlewares).for_each(|handler| {
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
 				handler.clone(),
@@ -267,11 +279,8 @@ where
 				handler.clone(),
 				false,
 			));
-			self.trace_stack.push(MiddlewareHandler::new(
-				path,
-				handler.clone(),
-				false,
-			));
+			self.trace_stack
+				.push(MiddlewareHandler::new(path, handler, false));
 		});
 	}
 
@@ -386,12 +395,8 @@ where
 		));
 	}
 
-	pub async fn resolve(
-		&self,
-		context: TContext,
-	) -> Result<TContext, Error<TContext>> {
-		let stack =
-			self.get_middleware_stack(context.get_method(), context.get_path());
+	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error> {
+		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
 		chained_run(context, Arc::new(stack), 0).await
 	}
 
