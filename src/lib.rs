@@ -16,7 +16,7 @@ pub mod default_middlewares;
 pub use app::App;
 pub use context::{default_context_generator, Context, DefaultContext};
 pub use cookie::{Cookie, CookieOptions, SameSite};
-pub use error::Error;
+pub use error::{AsError, Error};
 pub use http_method::HttpMethod;
 pub use middleware::{DefaultMiddleware, Middleware, NextHandler};
 pub use renderer::RenderEngine;
@@ -34,6 +34,7 @@ use hyper::{
 	Request as HyperRequest,
 	Response as HyperResponse,
 	Server,
+	StatusCode,
 };
 use std::{fmt::Debug, net::SocketAddr, sync::Arc};
 
@@ -73,11 +74,18 @@ pub async fn listen<TContext, TMiddleware, TState, TShutdownSignal>(
 								Err(err) => {
 									// return a proper formatted error, if an error handler exists
 									if app.error_handler.is_none() {
-										return Ok::<_, HyperError>(
+										let mut hyper_response =
 											HyperResponse::new(Body::from(
-												err.message,
-											)),
-										);
+												err.body.unwrap_or_else(|| {
+													"Internal server error"
+														.as_bytes()
+														.to_vec()
+												}),
+											));
+										*hyper_response.status_mut() =
+										StatusCode::from_u16(err.status.unwrap_or(500))
+											.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+										return Ok(hyper_response);
 									} else {
 										let response = Response::new();
 										(app.error_handler.as_ref().unwrap())(

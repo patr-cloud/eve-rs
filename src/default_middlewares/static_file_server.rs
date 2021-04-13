@@ -1,4 +1,4 @@
-use crate::{Context, Error, Middleware, NextHandler};
+use crate::{AsError, Context, Error, Middleware, NextHandler};
 use std::fmt::Debug;
 use tokio::fs;
 
@@ -23,14 +23,17 @@ impl StaticFileServer {
 		&self,
 		mut context: TContext,
 		next: NextHandler<TContext>,
-	) -> Result<TContext, Error<TContext>>
+	) -> Result<TContext, Error>
 	where
 		TContext: Context + Debug + Send + Sync,
 	{
 		let file_location =
 			format!("{}{}", self.folder_path, context.get_path());
 		if is_file(&file_location).await {
-			let content = fs::read(file_location).await?;
+			let content = fs::read(file_location)
+				.await
+				.status(500)
+				.body("Internal server error")?;
 			context.body_bytes(&content);
 			Ok(context)
 		} else {
@@ -48,7 +51,7 @@ where
 		&self,
 		context: TContext,
 		next: NextHandler<TContext>,
-	) -> Result<TContext, Error<TContext>> {
+	) -> Result<TContext, Error> {
 		self.serve(context, next).await
 	}
 }

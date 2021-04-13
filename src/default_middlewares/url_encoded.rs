@@ -1,10 +1,8 @@
-use crate::{Context, DefaultMiddleware, Error};
+use crate::{AsError, Context, DefaultMiddleware, Error};
 use serde_json::Value;
 use std::fmt::Debug;
 
-pub fn parser<TContext>(
-	context: &TContext,
-) -> Result<Option<Value>, Error<TContext>>
+pub fn parser<TContext>(context: &TContext) -> Result<Option<Value>, Error>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
 {
@@ -13,7 +11,11 @@ where
 			.get_request()
 			.get_body()
 			.unwrap_or_else(|_| "None".to_string());
-		Ok(Some(serde_urlencoded::from_bytes(body.as_bytes())?))
+		Ok(Some(
+			serde_urlencoded::from_bytes(body.as_bytes())
+				.status(500)
+				.body("Internal server error")?,
+		))
 	} else {
 		Ok(None)
 	}
