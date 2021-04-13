@@ -396,7 +396,8 @@ where
 	}
 
 	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error> {
-		let stack = self.get_middleware_stack(context.get_method(), context.get_path());
+		let stack =
+			self.get_middleware_stack(context.get_method(), context.get_path());
 		chained_run(context, Arc::new(stack), 0).await
 	}
 

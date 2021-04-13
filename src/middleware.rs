@@ -5,7 +5,11 @@ use crate::{
 use std::{fmt::Debug, future::Future, pin::Pin};
 
 pub type NextHandler<TContext> = Box<
-	dyn Fn(TContext) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>> + Send + Sync,
+	dyn Fn(
+			TContext,
+		) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>>
+		+ Send
+		+ Sync,
 >;
 
 #[async_trait::async_trait]

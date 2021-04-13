@@ -105,21 +105,30 @@ where
 	fn status(self, status: u16) -> Result<Value, Error> {
 		match self {
 			Some(value) => Ok(value),
-			None => Err(Error::new(Box::new(IoError::from(ErrorKind::NotFound))).status(status)),
+			None => {
+				Err(Error::new(Box::new(IoError::from(ErrorKind::NotFound)))
+					.status(status))
+			}
 		}
 	}
 
 	fn body_bytes(self, body: &[u8]) -> Result<Value, Error> {
 		match self {
 			Some(value) => Ok(value),
-			None => Err(Error::new(Box::new(IoError::from(ErrorKind::NotFound))).body_bytes(body)),
+			None => {
+				Err(Error::new(Box::new(IoError::from(ErrorKind::NotFound)))
+					.body_bytes(body))
+			}
 		}
 	}
 
 	fn body(self, body: &str) -> Result<Value, Error> {
 		match self {
 			Some(value) => Ok(value),
-			None => Err(Error::new(Box::new(IoError::from(ErrorKind::NotFound))).body(body)),
+			None => {
+				Err(Error::new(Box::new(IoError::from(ErrorKind::NotFound)))
+					.body(body))
+			}
 		}
 	}
 }
