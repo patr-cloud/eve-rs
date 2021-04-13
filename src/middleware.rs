@@ -5,12 +5,7 @@ use crate::{
 use std::{fmt::Debug, future::Future, pin::Pin};
 
 pub type NextHandler<TContext> = Box<
-	dyn Fn(
-			TContext,
-		) -> Pin<
-			Box<dyn Future<Output = Result<TContext, Error<TContext>>> + Send>,
-		> + Send
-		+ Sync,
+	dyn Fn(TContext) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>> + Send + Sync,
 >;
 
 #[async_trait::async_trait]
@@ -19,18 +14,14 @@ pub trait Middleware<TContext: Context + Debug + Send + Sync> {
 		&self,
 		context: TContext,
 		next: NextHandler<TContext>,
-	) -> Result<TContext, Error<TContext>>;
+	) -> Result<TContext, Error>;
 }
 
-type DefaultMiddlewareHandler = fn(
-	DefaultContext,
-	NextHandler<DefaultContext>,
-) -> Pin<
-	Box<
-		dyn Future<Output = Result<DefaultContext, Error<DefaultContext>>>
-			+ Send,
-	>,
->;
+type DefaultMiddlewareHandler =
+	fn(
+		DefaultContext,
+		NextHandler<DefaultContext>,
+	) -> Pin<Box<dyn Future<Output = Result<DefaultContext, Error>> + Send>>;
 
 #[derive(Clone)]
 pub struct DefaultMiddleware<TData>
@@ -69,7 +60,7 @@ where
 		&self,
 		context: DefaultContext,
 		next: NextHandler<DefaultContext>,
-	) -> Result<DefaultContext, Error<DefaultContext>> {
+	) -> Result<DefaultContext, Error> {
 		(self.handler)(context, next).await
 	}
 }
