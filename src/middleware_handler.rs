@@ -2,22 +2,26 @@ use crate::{Context, Middleware};
 use regex::Regex;
 use std::{fmt::Debug, marker::PhantomData};
 
-pub(crate) struct MiddlewareHandler<TContext, TMiddleware>
+pub(crate) struct MiddlewareHandler<TContext, TMiddleware, TErrorData>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: Default + Send + Sync,
 {
 	pub(crate) is_endpoint: bool,
 	pub(crate) mounted_url: String,
 	pub(crate) path_match: Regex,
 	pub(crate) handler: TMiddleware,
-	phantom: PhantomData<TContext>,
+	phantom_context: PhantomData<TContext>,
+	phantom_error: PhantomData<TErrorData>,
 }
 
-impl<TContext, TMiddleware> Clone for MiddlewareHandler<TContext, TMiddleware>
+impl<TContext, TMiddleware, TErrorData> Clone
+	for MiddlewareHandler<TContext, TMiddleware, TErrorData>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: Default + Send + Sync,
 {
 	fn clone(&self) -> Self {
 		MiddlewareHandler {
@@ -25,15 +29,18 @@ where
 			mounted_url: self.mounted_url.clone(),
 			path_match: self.path_match.clone(),
 			handler: self.handler.clone(),
-			phantom: PhantomData,
+			phantom_context: PhantomData,
+			phantom_error: PhantomData,
 		}
 	}
 }
 
-impl<TContext, TMiddleware> MiddlewareHandler<TContext, TMiddleware>
+impl<TContext, TMiddleware, TErrorData>
+	MiddlewareHandler<TContext, TMiddleware, TErrorData>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: Default + Send + Sync,
 {
 	pub(crate) fn new(
 		path: &str,
@@ -99,7 +106,8 @@ where
 			mounted_url,
 			path_match: Regex::new(&regex_path).unwrap(),
 			handler,
-			phantom: PhantomData,
+			phantom_context: PhantomData,
+			phantom_error: PhantomData,
 		}
 	}
 
