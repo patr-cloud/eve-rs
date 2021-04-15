@@ -4,32 +4,32 @@ use std::{
 	ops::{Deref, DerefMut},
 };
 
-pub struct Error<ErrorData>
+pub struct Error<TErrorData>
 where
-	ErrorData: Default,
+	TErrorData: Default,
 {
 	error: Box<dyn StdError + Send + Sync>,
 	status: Option<u16>,
 	body: Option<Vec<u8>>,
-	data: ErrorData,
+	data: TErrorData,
 }
 
-impl<ErrorData> Error<ErrorData>
+impl<TErrorData> Error<TErrorData>
 where
-	ErrorData: Default,
+	TErrorData: Default,
 {
-	pub fn new(error: Box<dyn StdError + Send + Sync>) -> Error<ErrorData> {
+	pub fn new(error: Box<dyn StdError + Send + Sync>) -> Error<TErrorData> {
 		Error {
 			body: None,
 			status: None,
 			error,
-			data: ErrorData::default(),
+			data: TErrorData::default(),
 		}
 	}
 
 	pub fn new_with_data(
 		error: Box<dyn StdError + Send + Sync>,
-		data: ErrorData,
+		data: TErrorData,
 	) -> Self {
 		Error {
 			error,
@@ -39,20 +39,24 @@ where
 		}
 	}
 
-	pub fn empty() -> Error<ErrorData> {
+	pub fn empty() -> Error<TErrorData> {
 		Error {
 			body: None,
 			status: None,
 			error: Box::new(IoError::from(ErrorKind::NotFound)),
-			data: ErrorData::default(),
+			data: TErrorData::default(),
 		}
+	}
+
+	pub fn result<TValue>() -> Result<TValue, Error<TErrorData>> {
+		Err(Error::empty())
 	}
 
 	pub fn get_status(&self) -> Option<u16> {
 		self.status
 	}
 
-	pub fn status(mut self, status: u16) -> Error<ErrorData> {
+	pub fn status(mut self, status: u16) -> Error<TErrorData> {
 		self.status = Some(status);
 		self
 	}
@@ -83,15 +87,15 @@ where
 		self
 	}
 
-	pub fn get_data(&self) -> &ErrorData {
+	pub fn get_data(&self) -> &TErrorData {
 		&self.data
 	}
 
-	pub fn get_data_mut(&mut self) -> &mut ErrorData {
+	pub fn get_data_mut(&mut self) -> &mut TErrorData {
 		&mut self.data
 	}
 
-	pub fn data(mut self, data: ErrorData) -> Self {
+	pub fn data(mut self, data: TErrorData) -> Self {
 		self.data = data;
 		self
 	}
