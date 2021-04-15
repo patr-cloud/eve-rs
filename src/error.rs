@@ -39,6 +39,15 @@ where
 		}
 	}
 
+	pub fn empty() -> Error<ErrorData> {
+		Error {
+			body: None,
+			status: None,
+			error: Box::new(IoError::from(ErrorKind::NotFound)),
+			data: ErrorData::default(),
+		}
+	}
+
 	pub fn get_status(&self) -> Option<u16> {
 		self.status
 	}
@@ -67,6 +76,11 @@ where
 
 	pub fn get_error(&self) -> &Box<dyn StdError + Send + Sync> {
 		&self.error
+	}
+
+	pub fn error(mut self, error: Box<dyn StdError + Send + Sync>) -> Self {
+		self.error = error;
+		self
 	}
 
 	pub fn get_data(&self) -> &ErrorData {
