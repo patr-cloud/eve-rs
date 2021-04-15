@@ -48,7 +48,7 @@ where
 		}
 	}
 
-	pub fn result<TValue>() -> Result<TValue, Error<TErrorData>> {
+	pub fn as_result<TValue>() -> Result<TValue, Error<TErrorData>> {
 		Err(Error::empty())
 	}
 
