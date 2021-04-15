@@ -74,8 +74,8 @@ where
 		self
 	}
 
-	pub fn get_error(&self) -> &Box<dyn StdError + Send + Sync> {
-		&self.error
+	pub fn get_error(&self) -> &(dyn StdError + Send + Sync) {
+		self.error.as_ref()
 	}
 
 	pub fn error(mut self, error: Box<dyn StdError + Send + Sync>) -> Self {
