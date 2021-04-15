@@ -1,8 +1,9 @@
+use std::{fmt::Debug, future::Future, pin::Pin};
+
 use crate::{
 	context::{Context, DefaultContext},
 	error::{DefaultError, Error},
 };
-use std::{fmt::Debug, future::Future, pin::Pin};
 
 pub type NextHandler<TContext, TErrorData> = Box<
 	dyn Fn(

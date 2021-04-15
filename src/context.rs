@@ -1,10 +1,11 @@
-use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
-
-use serde_json::Value;
 use std::{
 	net::IpAddr,
 	str::{self, Utf8Error},
 };
+
+use serde_json::Value;
+
+use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
 
 pub trait Context {
 	fn get_request(&self) -> &Request;

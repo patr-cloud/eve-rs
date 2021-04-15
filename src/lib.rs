@@ -13,19 +13,15 @@ mod renderer;
 
 pub mod default_middlewares;
 
+use std::{fmt::Debug, net::SocketAddr, sync::Arc};
+
 pub use app::App;
 pub use context::{default_context_generator, Context, DefaultContext};
 pub use cookie::{Cookie, CookieOptions, SameSite};
 pub use error::{AsError, DefaultError, Error};
-pub use http_method::HttpMethod;
-pub use middleware::{DefaultMiddleware, Middleware, NextHandler};
-pub use renderer::RenderEngine;
-pub use request::Request;
-pub use response::Response;
-
-pub use handlebars;
-
 use futures::Future;
+pub use handlebars;
+pub use http_method::HttpMethod;
 use hyper::{
 	server::conn::AddrStream,
 	service::{make_service_fn, service_fn},
@@ -36,7 +32,10 @@ use hyper::{
 	Server,
 	StatusCode,
 };
-use std::{fmt::Debug, net::SocketAddr, sync::Arc};
+pub use middleware::{DefaultMiddleware, Middleware, NextHandler};
+pub use renderer::RenderEngine;
+pub use request::Request;
+pub use response::Response;
 
 pub async fn listen<
 	TContext,
@@ -80,7 +79,8 @@ pub async fn listen<
 							let response = match result {
 								Ok(context) => context.take_response(),
 								Err(err) => {
-									// return a proper formatted error, if an error handler exists
+									// return a proper formatted error, if an
+									// error handler exists
 									if let Some(handler) = app.error_handler {
 										let response = Response::new();
 										handler(response, err)

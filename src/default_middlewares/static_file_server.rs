@@ -1,6 +1,8 @@
-use crate::{AsError, Context, Error, Middleware, NextHandler};
 use std::fmt::Debug;
+
 use tokio::fs;
+
+use crate::{AsError, Context, Error, Middleware, NextHandler};
 
 #[derive(Clone)]
 pub struct StaticFileServer {

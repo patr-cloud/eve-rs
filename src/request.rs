@@ -1,11 +1,13 @@
-use crate::{cookie::Cookie, HttpMethod};
-use hyper::{body, Body, Request as HyperRequestInternal, Uri, Version};
 use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
 	net::{IpAddr, SocketAddr},
 	str::{self, Utf8Error},
 };
+
+use hyper::{body, Body, Request as HyperRequestInternal, Uri, Version};
+
+use crate::{cookie::Cookie, HttpMethod};
 
 pub type HyperRequest = HyperRequestInternal<Body>;
 

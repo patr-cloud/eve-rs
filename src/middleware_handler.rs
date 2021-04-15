@@ -1,6 +1,8 @@
-use crate::{Context, Middleware};
-use regex::Regex;
 use std::{fmt::Debug, marker::PhantomData};
+
+use regex::Regex;
+
+use crate::{Context, Middleware};
 
 pub(crate) struct MiddlewareHandler<TContext, TMiddleware, TErrorData>
 where
@@ -83,20 +85,24 @@ where
 			.replace('*', "([^\\/].)+") // Match anything that's not a /, but at least 1 character
 			.replace("**", "(.)+"); //Match anything
 
-		// Make a variable out of anything that begins with a : and has a-z, A-Z, 0-9, '_'
+		// Make a variable out of anything that begins with a : and has a-z,
+		// A-Z, 0-9, '_'
 		regex_path = Regex::new(":(?P<var>([a-zA-Z0-9_]+))")
 			.unwrap()
-			// Match that variable with anything that has a-z, A-Z, 0-9, '_', '.' and a '-'
+			// Match that variable with anything that has a-z, A-Z, 0-9, '_',
+			// '.' and a '-'
 			.replace_all(&regex_path, "(?P<$var>([a-zA-Z0-9_\\.-]+))")
 			.to_string();
 
 		if regex_path != "/" {
 			// If there's something to match with,
-			// add the Regex to mention that both / and non / should match at the end of the url
+			// add the Regex to mention that both / and non / should match at
+			// the end of the url
 			regex_path.push_str("[/]?");
 		}
 
-		// If this is only supposed to match an endpoint URL, make sure the Regex only allows the end of the path
+		// If this is only supposed to match an endpoint URL, make sure the
+		// Regex only allows the end of the path
 		if is_endpoint {
 			regex_path.push('$');
 		}

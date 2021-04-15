@@ -1,3 +1,12 @@
+use std::{
+	array::IntoIter,
+	collections::HashMap,
+	fmt::Debug,
+	future::Future,
+	pin::Pin,
+	sync::Arc,
+};
+
 use crate::{
 	context::Context,
 	error::Error,
@@ -6,15 +15,6 @@ use crate::{
 	middleware_handler::MiddlewareHandler,
 	Request,
 	Response,
-};
-
-use std::{
-	array::IntoIter,
-	collections::HashMap,
-	fmt::Debug,
-	future::Future,
-	pin::Pin,
-	sync::Arc,
 };
 
 type ContextGeneratorFn<TContext, TState> = fn(Request, &TState) -> TContext;

@@ -1,7 +1,9 @@
-use crate::Context;
+use std::{fmt::Debug, time::Instant};
+
 use chrono::Local;
 use colored::Colorize;
-use std::{fmt::Debug, time::Instant};
+
+use crate::Context;
 
 pub struct LoggerMiddleware<TContext>
 where
