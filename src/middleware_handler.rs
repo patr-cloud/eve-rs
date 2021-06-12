@@ -116,8 +116,4 @@ where
 			phantom_error: PhantomData,
 		}
 	}
-
-	pub(crate) fn is_match(&self, url: &str) -> bool {
-		self.path_match.is_match(url)
-	}
 }

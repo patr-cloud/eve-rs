@@ -7,6 +7,8 @@ use std::{
 	sync::Arc,
 };
 
+use regex::{RegexSet, SetMatches};
+
 use crate::{
 	context::Context,
 	error::Error,
@@ -23,7 +25,8 @@ type ErrorHandlerFn<TErrorData> = fn(Response, Error<TErrorData>) -> Response;
 fn chained_run<TContext, TMiddleware, TErrorData>(
 	mut context: TContext,
 	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>>,
-	i: usize,
+	matches: SetMatches,
+	mut i: usize,
 ) -> Pin<Box<dyn Future<Output = Result<TContext, Error<TErrorData>>> + Send>>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
@@ -31,6 +34,9 @@ where
 		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
 	TErrorData: 'static + Default + Send + Sync,
 {
+	while i < matches.len() && !matches.matched(i) {
+		i += 1;
+	}
 	Box::pin(async move {
 		if let Some(m) = nodes.clone().get(i) {
 			// add populating the url parameters here
@@ -55,7 +61,12 @@ where
 				.run_middleware(
 					context,
 					Box::new(move |context| {
-						chained_run(context, nodes.clone(), i + 1)
+						chained_run(
+							context,
+							nodes.clone(),
+							matches.clone(),
+							i + 1,
+						)
 					}),
 				)
 				.await
@@ -82,14 +93,31 @@ where
 	pub(crate) error_handler: Option<ErrorHandlerFn<TErrorData>>,
 
 	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	get_regex_set: Option<RegexSet>,
+
 	post_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	post_regex_set: Option<RegexSet>,
+
 	put_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	put_regex_set: Option<RegexSet>,
+
 	delete_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	delete_regex_set: Option<RegexSet>,
+
 	head_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	head_regex_set: Option<RegexSet>,
+
 	options_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	options_regex_set: Option<RegexSet>,
+
 	connect_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	connect_regex_set: Option<RegexSet>,
+
 	patch_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	patch_regex_set: Option<RegexSet>,
+
 	trace_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	trace_regex_set: Option<RegexSet>,
 }
 
 impl<TContext, TMiddleware, TState, TErrorData>
@@ -111,14 +139,31 @@ where
 			error_handler: None,
 
 			get_stack: vec![],
+			get_regex_set: None,
+
 			post_stack: vec![],
+			post_regex_set: None,
+
 			put_stack: vec![],
+			put_regex_set: None,
+
 			delete_stack: vec![],
+			delete_regex_set: None,
+
 			head_stack: vec![],
+			head_regex_set: None,
+
 			options_stack: vec![],
+			options_regex_set: None,
+
 			connect_stack: vec![],
+			connect_regex_set: None,
+
 			patch_stack: vec![],
+			patch_regex_set: None,
+
 			trace_stack: vec![],
+			trace_regex_set: None,
 		}
 	}
 
@@ -407,9 +452,84 @@ where
 		&self,
 		context: TContext,
 	) -> Result<TContext, Error<TErrorData>> {
-		let stack =
+		let (stack, matches) =
 			self.get_middleware_stack(context.get_method(), context.get_path());
-		chained_run(context, Arc::new(stack), 0).await
+		chained_run(context, Arc::new(stack), matches, 0).await
+	}
+
+	pub fn build(&mut self) {
+		self.get_regex_set = Some(
+			RegexSet::new(
+				self.get_stack
+					.iter()
+					.map(|middleware| middleware.mounted_url.as_str()),
+			)
+			.unwrap(),
+		);
+		self.post_regex_set = Some(
+			RegexSet::new(
+				self.post_stack
+					.iter()
+					.map(|middleware| middleware.mounted_url.as_str()),
+			)
+			.unwrap(),
+		);
+		self.put_regex_set = Some(
+			RegexSet::new(
+				self.put_stack
+					.iter()
+					.map(|middleware| middleware.mounted_url.as_str()),
+			)
+			.unwrap(),
+		);
+		self.delete_regex_set = Some(
+			RegexSet::new(
+				self.delete_stack
+					.iter()
+					.map(|middleware| middleware.mounted_url.as_str()),
+			)
+			.unwrap(),
+		);
+		self.head_regex_set = Some(
+			RegexSet::new(
+				self.head_stack
+					.iter()
+					.map(|middleware| middleware.mounted_url.as_str()),
+			)
+			.unwrap(),
+		);
+		self.options_regex_set = Some(
+			RegexSet::new(
+				self.options_stack
+					.iter()
+					.map(|middleware| middleware.mounted_url.as_str()),
+			)
+			.unwrap(),
+		);
+		self.connect_regex_set = Some(
+			RegexSet::new(
+				self.connect_stack
+					.iter()
+					.map(|middleware| middleware.mounted_url.as_str()),
+			)
+			.unwrap(),
+		);
+		self.patch_regex_set = Some(
+			RegexSet::new(
+				self.patch_stack
+					.iter()
+					.map(|middleware| middleware.mounted_url.as_str()),
+			)
+			.unwrap(),
+		);
+		self.trace_regex_set = Some(
+			RegexSet::new(
+				self.trace_stack
+					.iter()
+					.map(|middleware| middleware.mounted_url.as_str()),
+			)
+			.unwrap(),
+		);
 	}
 
 	pub(crate) fn generate_context(&self, request: Request) -> TContext {
@@ -420,25 +540,76 @@ where
 		&self,
 		method: &HttpMethod,
 		path: String,
-	) -> Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>> {
-		let mut stack = vec![];
-		let route_stack = match method {
-			HttpMethod::Get => &self.get_stack,
-			HttpMethod::Post => &self.post_stack,
-			HttpMethod::Put => &self.put_stack,
-			HttpMethod::Delete => &self.delete_stack,
-			HttpMethod::Head => &self.head_stack,
-			HttpMethod::Options => &self.options_stack,
-			HttpMethod::Connect => &self.connect_stack,
-			HttpMethod::Patch => &self.patch_stack,
-			HttpMethod::Trace => &self.trace_stack,
-		};
-		for handler in route_stack {
-			if handler.is_match(&path) {
-				stack.push(handler.clone());
-			}
+	) -> (
+		Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+		SetMatches,
+	) {
+		const UNBUILT_ERROR: &str = "cannot get middleware stack without building the application first";
+		match method {
+			HttpMethod::Get => (
+				self.get_stack.clone(),
+				self.get_regex_set
+					.as_ref()
+					.expect(UNBUILT_ERROR)
+					.matches(&path),
+			),
+			HttpMethod::Post => (
+				self.post_stack.clone(),
+				self.post_regex_set
+					.as_ref()
+					.expect(UNBUILT_ERROR)
+					.matches(&path),
+			),
+			HttpMethod::Put => (
+				self.put_stack.clone(),
+				self.put_regex_set
+					.as_ref()
+					.expect(UNBUILT_ERROR)
+					.matches(&path),
+			),
+			HttpMethod::Delete => (
+				self.delete_stack.clone(),
+				self.delete_regex_set
+					.as_ref()
+					.expect(UNBUILT_ERROR)
+					.matches(&path),
+			),
+			HttpMethod::Head => (
+				self.head_stack.clone(),
+				self.head_regex_set
+					.as_ref()
+					.expect(UNBUILT_ERROR)
+					.matches(&path),
+			),
+			HttpMethod::Options => (
+				self.options_stack.clone(),
+				self.options_regex_set
+					.as_ref()
+					.expect(UNBUILT_ERROR)
+					.matches(&path),
+			),
+			HttpMethod::Connect => (
+				self.connect_stack.clone(),
+				self.connect_regex_set
+					.as_ref()
+					.expect(UNBUILT_ERROR)
+					.matches(&path),
+			),
+			HttpMethod::Patch => (
+				self.patch_stack.clone(),
+				self.patch_regex_set
+					.as_ref()
+					.expect(UNBUILT_ERROR)
+					.matches(&path),
+			),
+			HttpMethod::Trace => (
+				self.trace_stack.clone(),
+				self.trace_regex_set
+					.as_ref()
+					.expect(UNBUILT_ERROR)
+					.matches(&path),
+			),
 		}
-		stack
 	}
 }
 
@@ -472,14 +643,31 @@ where
 			error_handler: self.error_handler,
 
 			get_stack: self.get_stack.clone(),
+			get_regex_set: self.get_regex_set.clone(),
+
 			post_stack: self.post_stack.clone(),
+			post_regex_set: self.post_regex_set.clone(),
+
 			put_stack: self.put_stack.clone(),
+			put_regex_set: self.put_regex_set.clone(),
+
 			delete_stack: self.delete_stack.clone(),
+			delete_regex_set: self.delete_regex_set.clone(),
+
 			head_stack: self.head_stack.clone(),
+			head_regex_set: self.head_regex_set.clone(),
+
 			options_stack: self.options_stack.clone(),
+			options_regex_set: self.options_regex_set.clone(),
+
 			connect_stack: self.connect_stack.clone(),
+			connect_regex_set: self.connect_regex_set.clone(),
+
 			patch_stack: self.patch_stack.clone(),
+			patch_regex_set: self.patch_regex_set.clone(),
+
 			trace_stack: self.trace_stack.clone(),
+			trace_regex_set: self.trace_regex_set.clone(),
 		}
 	}
 }
