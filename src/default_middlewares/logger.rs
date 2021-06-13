@@ -50,7 +50,7 @@ where
 		let elapsed_time =
 			Instant::now().duration_since(self.measurer.unwrap());
 
-		if (self.should_skip)(&context) {
+		if (self.should_skip)(context) {
 			return None;
 		}
 		let reqs = self
@@ -64,7 +64,7 @@ where
 					&self.log_format[(index + 5)..header_end_index];
 				Some((
 					header_name.to_string(),
-					context.get_header(&header_name)?,
+					context.get_header(header_name)?,
 				))
 			})
 			.collect::<Vec<(String, String)>>();
@@ -80,7 +80,7 @@ where
 					&self.log_format[(index + 5)..(index + header_end_index)];
 				Some((
 					header_name.to_string(),
-					context.get_response().get_header(&header_name)?,
+					context.get_response().get_header(header_name)?,
 				))
 			})
 			.collect::<Vec<(String, String)>>();

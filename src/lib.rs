@@ -44,7 +44,7 @@ pub async fn listen<
 	TErrorData,
 	TShutdownSignal,
 >(
-	app: App<TContext, TMiddleware, TState, TErrorData>,
+	mut app: App<TContext, TMiddleware, TState, TErrorData>,
 	bind_addr: ([u8; 4], u16),
 	shutdown_signal: Option<TShutdownSignal>,
 ) where
@@ -57,6 +57,7 @@ pub async fn listen<
 {
 	let bind_addr = SocketAddr::from(bind_addr);
 
+	app.build();
 	let app_arc = Arc::new(app);
 
 	async move {

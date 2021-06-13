@@ -48,7 +48,7 @@ impl CompressionHandler {
 			let data = context.get_response().get_body();
 			let mut output = [];
 			if let Ok(Status::Ok) = self.zlib_compressor.compress(
-				&data,
+				data,
 				&mut output,
 				FlushCompress::None,
 			) {
