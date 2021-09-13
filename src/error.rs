@@ -154,7 +154,6 @@ where
 	Value: Send + Sync,
 	TErrorData: Default + Send + Sync,
 {
-	fn as_error(self) -> Result<Value, Error<TErrorData>>;
 	fn status(self, status: u16) -> Result<Value, Error<TErrorData>>;
 	fn body_bytes(self, body: &[u8]) -> Result<Value, Error<TErrorData>>;
 	fn body<TBody>(self, body: TBody) -> Result<Value, Error<TErrorData>>
@@ -169,15 +168,6 @@ where
 	Value: Send + Sync,
 	TErrorData: Default + Send + Sync,
 {
-	fn as_error(self) -> Result<Value, Error<TErrorData>> {
-		match self {
-			Ok(value) => Ok(value),
-			Err(err) => {
-				Err(Error::new_with_data(Box::new(err), TErrorData::default()))
-			}
-		}
-	}
-
 	fn status(self, status: u16) -> Result<Value, Error<TErrorData>> {
 		match self {
 			Ok(value) => Ok(value),
@@ -218,10 +208,6 @@ where
 	Value: Send + Sync,
 	TErrorData: Default + Send + Sync,
 {
-	fn as_error(self) -> Result<Value, Error<TErrorData>> {
-		self
-	}
-
 	fn status(self, status: u16) -> Result<Value, Error<TErrorData>> {
 		match self {
 			Ok(value) => Ok(value),
@@ -252,13 +238,6 @@ where
 	Value: Send + Sync,
 	TErrorData: Default + Send + Sync,
 {
-	fn as_error(self) -> Result<Value, Error<TErrorData>> {
-		match self {
-			Some(value) => Ok(value),
-			None => Err(Error::empty()),
-		}
-	}
-
 	fn status(self, status: u16) -> Result<Value, Error<TErrorData>> {
 		match self {
 			Some(value) => Ok(value),
