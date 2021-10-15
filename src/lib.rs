@@ -43,9 +43,10 @@ pub async fn listen<
 	TState,
 	TErrorData,
 	TShutdownSignal,
+	TListenAddr,
 >(
 	app: App<TContext, TMiddleware, TState, TErrorData>,
-	bind_addr: ([u8; 4], u16),
+	bind_addr: TListenAddr,
 	shutdown_signal: Option<TShutdownSignal>,
 ) where
 	TContext: 'static + Context + Debug + Send + Sync,
@@ -54,9 +55,8 @@ pub async fn listen<
 	TState: 'static + Send + Sync,
 	TShutdownSignal: Future<Output = ()>,
 	TErrorData: 'static + Default + Send + Sync,
+	TListenAddr: Into<SocketAddr>,
 {
-	let bind_addr = SocketAddr::from(bind_addr);
-
 	let app_arc = Arc::new(app);
 
 	async move {
@@ -125,7 +125,7 @@ pub async fn listen<
 			}
 		});
 
-		let server = Server::bind(&bind_addr).serve(service);
+		let server = Server::bind(&bind_addr.into()).serve(service);
 
 		if let Some(shutdown_signal) = shutdown_signal {
 			server
