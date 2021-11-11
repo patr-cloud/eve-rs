@@ -18,12 +18,12 @@ pub trait Context {
 	fn get_body(&self) -> Result<String, Utf8Error> {
 		self.get_request().get_body()
 	}
-	fn json<TBody>(&mut self, body: &TBody) -> &mut Self
+	fn json<TBody>(&mut self, body: TBody) -> &mut Self
 	where
 		TBody: Serialize,
 	{
 		self.content_type("application/json").body(
-			&serde_json::to_string(body)
+			&serde_json::to_string(&body)
 				.expect("unable to serialize body into JSON"),
 		)
 	}
