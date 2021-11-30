@@ -7,35 +7,40 @@ mod middleware;
 mod middleware_handler;
 mod request;
 mod response;
-//mod headers;
+// mod headers;
 #[cfg(feature = "render")]
 mod renderer;
 
-pub mod default_middlewares;
+//pub mod default_middlewares;
 
-use std::{fmt::Debug, net::SocketAddr, sync::Arc};
+use std::{convert::TryInto, fmt::Debug, net::SocketAddr, sync::Arc};
 
-pub use app::App;
-pub use context::{default_context_generator, Context, DefaultContext};
-pub use cookie::{Cookie, CookieOptions, SameSite};
-pub use error::{AsError, DefaultError, Error};
 use futures::Future;
 pub use handlebars;
-pub use http_method::HttpMethod;
 use hyper::{
 	server::conn::AddrStream,
 	service::{make_service_fn, service_fn},
 	Body,
 	Error as HyperError,
+	HeaderMap,
 	Request as HyperRequest,
 	Response as HyperResponse,
 	Server,
-	StatusCode,
 };
-pub use middleware::{DefaultMiddleware, Middleware, NextHandler};
-pub use renderer::RenderEngine;
-pub use request::Request;
-pub use response::Response;
+use response::PreBodySenderData;
+use tokio::{sync::mpsc, task};
+
+pub use self::{
+	app::App,
+	context::{default_context_generator, Context, DefaultContext},
+	cookie::{Cookie, CookieOptions, SameSite},
+	error::{AsError, DefaultError, Error},
+	http_method::HttpMethod,
+	middleware::{DefaultMiddleware, Middleware, NextHandler},
+	renderer::RenderEngine,
+	request::Request,
+	response::Response,
+};
 
 pub async fn listen<
 	TContext,
@@ -66,58 +71,102 @@ pub async fn listen<
 
 			async move {
 				Ok::<_, HyperError>(service_fn(
-					move |req: HyperRequest<Body>| {
+					move |hyper_request: HyperRequest<Body>| {
 						let app = app.clone();
 						async move {
-							let request =
-								Request::from_hyper(remote_addr, req).await;
-							let mut context = app.generate_context(request);
-							context.header("Server", "Eve");
+							let method: HttpMethod =
+								match hyper_request.method().try_into() {
+									Ok(method) => method,
+									Err(_) => {
+										log::warn!(
+											"Unknown method. Ignoring request"
+										);
+										return Ok(HyperResponse::new(
+											Body::empty(),
+										));
+									}
+								};
+							let path = hyper_request.uri().path().to_string();
+							let request = Request::new(
+								remote_addr,
+								method.clone(),
+								hyper_request,
+							);
 
-							// execute app's middlewares
-							let result = app.resolve(context).await;
-							let response = match result {
-								Ok(context) => context.take_response(),
-								Err(err) => {
+							let (sender, mut receiver) =
+								mpsc::unbounded_channel();
+
+							task::spawn(async move {
+								let response = Response::new(sender.clone());
+
+								let mut context =
+									app.generate_context(request, response);
+
+								let _ = context.header("Server", "Eve");
+
+								// execute app's middlewares
+								let result = app.resolve(context).await;
+
+								if let Err(err) = result {
 									// return a proper formatted error, if an
 									// error handler exists
 									if let Some(handler) = app.error_handler {
-										let response = Response::new();
-										handler(response, err)
+										let response = Response::new(sender);
+										handler(response, err);
 									} else {
-										let mut hyper_response =
-											HyperResponse::new(Body::from(
-												Vec::from(
-													err.get_body_bytes()
-														.unwrap_or_else(|| {
-															"Internal server error"
-															.as_bytes()
-														}),
+										let _ = sender.send(
+											PreBodySenderData::Status(500),
+										);
+										let _ = sender.send(
+											PreBodySenderData::Body(
+												Body::from(
+													"Internal server error",
 												),
-											));
-										*hyper_response.status_mut() =
-										StatusCode::from_u16(err.get_status().unwrap_or(500))
-											.unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
-										return Ok(hyper_response);
+											),
+										);
 									}
-								}
-							};
+								};
+							});
 
-							let mut hyper_response = HyperResponse::builder();
+							let mut status = 404;
+							let mut body = Body::from(format!(
+								"Could not {} route {}",
+								method, path
+							));
+							let mut headers = HeaderMap::new();
 
-							// Set the appropriate headers
-							for (key, values) in &response.headers {
-								for value in values {
-									hyper_response =
-										hyper_response.header(key, value);
+							while let Some(data) = receiver.recv().await {
+								match data {
+									PreBodySenderData::Status(value) => {
+										status = value;
+									}
+									PreBodySenderData::SetHeader(
+										key,
+										value,
+									) => {
+										headers.append(key, value);
+									}
+									PreBodySenderData::RemoveHeader(key) => {
+										headers.remove(key);
+									}
+									PreBodySenderData::ClearHeaders => {
+										headers.clear();
+									}
+									PreBodySenderData::Body(value) => {
+										body = value;
+										break;
+									}
 								}
 							}
 
+							let mut response_builder =
+								HyperResponse::builder().status(status);
+							for (key, value) in headers.iter() {
+								response_builder =
+									response_builder.header(key, value);
+							}
 							Ok::<HyperResponse<Body>, HyperError>(
-								hyper_response
-									.status(response.status)
-									.body(Body::from(response.body))
-									.unwrap(),
+								response_builder.body(body).unwrap_or_default(),
 							)
 						}
 					},

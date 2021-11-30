@@ -1,9 +1,12 @@
 use std::{
+	convert::TryFrom,
 	fmt::{Display, Error, Formatter},
 	str::FromStr,
 };
 
 use hyper::Method;
+
+use crate::request::RequestError;
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub enum HttpMethod {
@@ -60,22 +63,27 @@ impl FromStr for HttpMethod {
 	}
 }
 
-impl From<Method> for HttpMethod {
-	fn from(method: Method) -> Self {
+impl TryFrom<&Method> for HttpMethod {
+	type Error = RequestError;
+
+	fn try_from(method: &Method) -> Result<Self, Self::Error> {
 		match method {
-			Method::GET => HttpMethod::Get,
-			Method::POST => HttpMethod::Post,
-			Method::PUT => HttpMethod::Put,
-			Method::DELETE => HttpMethod::Delete,
-			Method::HEAD => HttpMethod::Head,
-			Method::OPTIONS => HttpMethod::Options,
-			Method::CONNECT => HttpMethod::Connect,
-			Method::PATCH => HttpMethod::Patch,
-			Method::TRACE => HttpMethod::Trace,
-			method => panic!(
-				"Could not recognise suitable HTTP method for {}",
-				method
-			),
+			&Method::GET => Ok(Self::Get),
+			&Method::POST => Ok(Self::Post),
+			&Method::PUT => Ok(Self::Put),
+			&Method::DELETE => Ok(Self::Delete),
+			&Method::HEAD => Ok(Self::Head),
+			&Method::OPTIONS => Ok(Self::Options),
+			&Method::CONNECT => Ok(Self::Connect),
+			&Method::PATCH => Ok(Self::Patch),
+			&Method::TRACE => Ok(Self::Trace),
+			method => {
+				log::warn!(
+					"Unable to parse {} as an http method. Ignoring...",
+					method
+				);
+				Err(RequestError::UnknownMethod(method.to_string()))
+			}
 		}
 	}
 }

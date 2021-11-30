@@ -1,39 +1,49 @@
-use std::{
-	net::IpAddr,
-	str::{self, Utf8Error},
-};
+use std::net::IpAddr;
 
 use serde::Serialize;
 use serde_json::Value;
 
-use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
+use crate::{
+	request::{Request, RequestError},
+	response::{Response, ResponseError},
+	HttpMethod,
+};
 
+#[async_trait::async_trait]
 pub trait Context {
 	fn get_request(&self) -> &Request;
 	fn get_request_mut(&mut self) -> &mut Request;
 	fn get_response(&self) -> &Response;
-	fn take_response(self) -> Response;
 	fn get_response_mut(&mut self) -> &mut Response;
 
-	fn get_body(&self) -> Result<String, Utf8Error> {
-		self.get_request().get_body()
+	async fn get_body(&mut self) -> Result<String, RequestError> {
+		let request = self.get_request_mut();
+		request.get_body().await
 	}
-	fn json<TBody>(&mut self, body: TBody) -> &mut Self
+	async fn json<TBody>(
+		&mut self,
+		body: TBody,
+	) -> Result<&mut Self, ResponseError>
 	where
-		TBody: Serialize,
+		TBody: Serialize + Send + Sync,
 	{
-		self.content_type("application/json").body(
-			&serde_json::to_string(&body)
-				.expect("unable to serialize body into JSON"),
-		)
+		self.content_type("application/json")?
+			.body(
+				&serde_json::to_string(&body)
+					.expect("unable to serialize body into JSON"),
+			)
+			.await
 	}
-	fn body(&mut self, string: &str) -> &mut Self {
-		self.get_response_mut().set_body(string);
-		self
+	async fn body(&mut self, string: &str) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().set_body(string).await?;
+		Ok(self)
 	}
-	fn body_bytes(&mut self, bytes: &[u8]) -> &mut Self {
-		self.get_response_mut().set_body_bytes(bytes);
-		self
+	async fn body_bytes(
+		&mut self,
+		bytes: &[u8],
+	) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().set_body_bytes(bytes).await?;
+		Ok(self)
 	}
 
 	fn get_method(&self) -> &HttpMethod {
@@ -46,29 +56,41 @@ pub trait Context {
 	fn get_status_message(&self) -> &str {
 		self.get_response().get_status_message()
 	}
-	fn status(&mut self, code: u16) -> &mut Self {
-		self.get_response_mut().set_status(code);
-		self
+	fn status(&mut self, code: u16) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().set_status(code)?;
+		Ok(self)
 	}
 
-	fn content_type(&mut self, content_type: &str) -> &mut Self {
-		self.get_response_mut().set_content_type(content_type);
-		self
+	fn content_type(
+		&mut self,
+		content_type: &str,
+	) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().set_content_type(content_type)?;
+		Ok(self)
 	}
 
-	fn content_length(&mut self, length: usize) -> &mut Self {
-		self.get_response_mut().set_content_length(length);
-		self
+	fn content_length(
+		&mut self,
+		length: usize,
+	) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().set_content_length(length)?;
+		Ok(self)
 	}
 
-	fn redirect(&mut self, destination: &str) -> &mut Self {
-		self.get_response_mut().redirect(destination);
-		self
+	fn redirect(
+		&mut self,
+		destination: &str,
+	) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().redirect(destination)?;
+		Ok(self)
 	}
 
-	fn attachment(&mut self, file_name: Option<&str>) -> &mut Self {
-		self.get_response_mut().attachment(file_name);
-		self
+	fn attachment(
+		&mut self,
+		file_name: Option<&str>,
+	) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().attachment(file_name)?;
+		Ok(self)
 	}
 
 	fn get_path(&self) -> String {
@@ -125,38 +147,42 @@ pub trait Context {
 	fn get_header(&self, key: &str) -> Option<String> {
 		self.get_request().get_header(key)
 	}
-	fn header(&mut self, key: &str, value: &str) -> &mut Self {
-		self.get_response_mut().set_header(key, value);
-		self
+	fn header(
+		&mut self,
+		key: &str,
+		value: &str,
+	) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().set_header(key, value)?;
+		Ok(self)
 	}
-	fn append_header(&mut self, key: &str, value: &str) -> &mut Self {
-		self.get_response_mut().append_header(key, value);
-		self
-	}
-	fn remove_header(&mut self, key: &str) -> &mut Self {
-		self.get_response_mut().remove_header(key);
-		self
-	}
-
-	fn get_cookie(&self, name: &str) -> Option<&Cookie> {
-		self.get_request().get_cookie(name)
-	}
-	fn get_cookies(&self) -> &Vec<Cookie> {
-		self.get_request().get_cookies()
-	}
-	fn cookie(&mut self, cookie: Cookie) -> &mut Self {
-		self.get_response_mut().set_cookie(cookie);
-		self
+	fn remove_header(&mut self, key: &str) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().remove_header(key)?;
+		Ok(self)
 	}
 
-	fn last_modified(&mut self, last_modified: &str) -> &mut Self {
-		self.get_response_mut().set_last_modified(last_modified);
-		self
+	// TODO
+	// fn get_cookie(&self, name: &str) -> Option<&Cookie> {
+	// 	self.get_request().get_cookie(name)
+	// }
+	// fn get_cookies(&self) -> &Vec<Cookie> {
+	// 	self.get_request().get_cookies()
+	// }
+	// fn cookie(&mut self, cookie: Cookie) -> Result<&mut Self, ResponseError>
+	// { 	self.get_response_mut().set_cookie(cookie);
+	// 	self
+	// }
+
+	fn last_modified(
+		&mut self,
+		last_modified: &str,
+	) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().set_last_modified(last_modified)?;
+		Ok(self)
 	}
 
-	fn etag(&mut self, etag: &str) -> &mut Self {
-		self.get_response_mut().set_etag(etag);
-		self
+	fn etag(&mut self, etag: &str) -> Result<&mut Self, ResponseError> {
+		self.get_response_mut().set_etag(etag)?;
+		Ok(self)
 	}
 }
 
@@ -176,10 +202,10 @@ impl DefaultContext {
 		self.body = Some(body);
 	}
 
-	pub fn new(request: Request) -> Self {
+	pub fn new(request: Request, response: Response) -> Self {
 		DefaultContext {
 			request,
-			response: Default::default(),
+			response,
 			body: None,
 		}
 	}
@@ -198,10 +224,6 @@ impl Context for DefaultContext {
 		&self.response
 	}
 
-	fn take_response(self) -> Response {
-		self.response
-	}
-
 	fn get_response_mut(&mut self) -> &mut Response {
 		&mut self.response
 	}
@@ -209,7 +231,8 @@ impl Context for DefaultContext {
 
 pub fn default_context_generator<TState>(
 	request: Request,
+	response: Response,
 	_: &TState,
 ) -> DefaultContext {
-	DefaultContext::new(request)
+	DefaultContext::new(request, response)
 }

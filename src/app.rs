@@ -17,8 +17,9 @@ use crate::{
 	Response,
 };
 
-type ContextGeneratorFn<TContext, TState> = fn(Request, &TState) -> TContext;
-type ErrorHandlerFn<TErrorData> = fn(Response, Error<TErrorData>) -> Response;
+type ContextGeneratorFn<TContext, TState> =
+	fn(Request, Response, &TState) -> TContext;
+type ErrorHandlerFn<TErrorData> = fn(Response, Error<TErrorData>);
 
 fn chained_run<TContext, TMiddleware, TErrorData>(
 	mut context: TContext,
@@ -60,11 +61,13 @@ where
 				)
 				.await
 		} else {
-			let method = context.get_method().to_string();
+			let method =
+				context.get_request().hyper_request.method().to_string();
 			let path = context.get_path();
 			context
-				.status(404)
-				.body(&format!("Cannot {} route {}", method, path));
+				.status(404)?
+				.body(&format!("Cannot {} route {}", method, path))
+				.await?;
 			Ok(context)
 		}
 	})
@@ -407,13 +410,17 @@ where
 		&self,
 		context: TContext,
 	) -> Result<TContext, Error<TErrorData>> {
-		let stack =
-			self.get_middleware_stack(context.get_method(), context.get_path());
+		let method = context.get_method();
+		let stack = self.get_middleware_stack(&method, context.get_path());
 		chained_run(context, Arc::new(stack), 0).await
 	}
 
-	pub(crate) fn generate_context(&self, request: Request) -> TContext {
-		(self.context_generator)(request, self.get_state())
+	pub(crate) fn generate_context(
+		&self,
+		request: Request,
+		response: Response,
+	) -> TContext {
+		(self.context_generator)(request, response, self.get_state())
 	}
 
 	fn get_middleware_stack(
@@ -452,7 +459,7 @@ where
 	TState: Default + Send + Sync,
 {
 	fn default() -> Self {
-		Self::create(|_, _| TContext::default(), TState::default())
+		Self::create(|_, _, _| TContext::default(), TState::default())
 	}
 }
 

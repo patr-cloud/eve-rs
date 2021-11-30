@@ -2,83 +2,88 @@ use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
 	net::{IpAddr, SocketAddr},
-	str::{self, Utf8Error},
 };
 
-use hyper::{body, Body, Request as HyperRequestInternal, Uri, Version};
+use hyper::{
+	body::HttpBody,
+	header,
+	Body,
+	Request as HyperRequestInternal,
+	Version,
+};
 
-use crate::{cookie::Cookie, HttpMethod};
+use crate::HttpMethod;
 
 pub type HyperRequest = HyperRequestInternal<Body>;
 
+#[derive(thiserror::Error, Debug)]
+pub enum RequestError {
+	#[error("error occured while reading from the socket: {0}")]
+	Io(hyper::Error),
+	#[error("cannot parse body as it exceeded the max length of {max_length}")]
+	PayloadTooLarge { max_length: usize },
+	#[error("unable to parse body. Unknown format")]
+	BodyParse,
+	#[error("unable to parse body bytes as utf8")]
+	Utf8,
+	#[error("unknown method `{0}`")]
+	UnknownMethod(String),
+}
+
 pub struct Request {
 	pub(crate) socket_addr: SocketAddr,
-	pub(crate) body: Vec<u8>,
-	pub(crate) method: HttpMethod,
-	pub(crate) uri: Uri,
-	pub(crate) version: (u8, u8),
-	pub(crate) headers: HashMap<String, Vec<String>>,
-	pub(crate) query: HashMap<String, String>,
-	pub(crate) params: HashMap<String, String>,
-	pub(crate) cookies: Vec<Cookie>,
 	pub(crate) hyper_request: HyperRequest,
+	pub(crate) method: HttpMethod,
+	pub(crate) params: HashMap<String, String>,
 }
 
 impl Request {
-	pub async fn from_hyper(
+	pub const MAX_REQUEST_LENGTH: usize = 10 * 1024 * 1024; // Max 10 MiB
+
+	pub(crate) fn new(
 		socket_addr: SocketAddr,
-		req: HyperRequest,
+		method: HttpMethod,
+		hyper_request: HyperRequest,
 	) -> Self {
-		let (parts, hyper_body) = req.into_parts();
-		let mut headers = HashMap::<String, Vec<String>>::new();
-		parts.headers.iter().for_each(|(key, value)| {
-			let key = key.to_string();
-			let value = value.to_str();
-
-			if value.is_err() {
-				return;
-			}
-			let value = value.unwrap().to_string();
-
-			if let Some(values) = headers.get_mut(&key) {
-				values.push(value);
-			} else {
-				headers.insert(key.to_string(), vec![value]);
-			}
-		});
-		let body = body::to_bytes(hyper_body).await.unwrap().to_vec();
 		Request {
 			socket_addr,
-			body: body.clone(),
-			method: HttpMethod::from(parts.method.clone()),
-			uri: parts.uri.clone(),
-			version: match parts.version {
-				Version::HTTP_09 => (0, 9),
-				Version::HTTP_10 => (1, 0),
-				Version::HTTP_11 => (1, 1),
-				Version::HTTP_2 => (2, 0),
-				Version::HTTP_3 => (3, 0),
-				_ => (0, 0),
-			},
-			headers: headers.clone(),
-			query: if let Some(query) = parts.uri.query() {
-				serde_urlencoded::from_str(query)
-					.unwrap_or_else(|_| HashMap::new())
-			} else {
-				HashMap::new()
-			},
+			hyper_request,
+			method,
 			params: HashMap::new(),
-			cookies: vec![],
-			hyper_request: HyperRequest::from_parts(parts, Body::from(body)),
 		}
 	}
 
-	pub fn get_body_bytes(&self) -> &[u8] {
-		&self.body
+	pub async fn get_body_bytes(&mut self) -> Result<Vec<u8>, RequestError> {
+		self.get_body_bytes_with_max_length(Self::MAX_REQUEST_LENGTH)
+			.await
 	}
 
-	pub fn get_body(&self) -> Result<String, Utf8Error> {
-		Ok(str::from_utf8(&self.body)?.to_string())
+	pub async fn get_body_bytes_with_max_length(
+		&mut self,
+		max_length: usize,
+	) -> Result<Vec<u8>, RequestError> {
+		let body = self.hyper_request.body_mut();
+		let mut bytes = if let Some(length) = body.size_hint().upper() {
+			vec![0; length as usize]
+		} else {
+			vec![]
+		};
+		while let Some(data) = body.data().await {
+			let data = data.map_err(|err| RequestError::Io(err))?;
+			if bytes.len() + data.len() >= max_length {
+				return Err(RequestError::PayloadTooLarge { max_length });
+			}
+			bytes.append(&mut data.to_vec());
+		}
+
+		Ok(bytes)
+	}
+
+	pub async fn get_body(&mut self) -> Result<String, RequestError> {
+		let body = self.get_body_bytes().await?;
+		let response =
+			String::from_utf8(body).map_err(|_| RequestError::Utf8)?;
+		Ok(response)
 	}
 
 	pub fn get_method(&self) -> &HttpMethod {
@@ -86,47 +91,56 @@ impl Request {
 	}
 
 	pub fn get_length(&self) -> u128 {
-		if let Some(length) = self.headers.get("Content-Length") {
-			if let Some(value) = length.get(0) {
-				if let Ok(value) = value.parse::<u128>() {
-					return value;
-				}
+		if let Some(length) = self
+			.hyper_request
+			.headers()
+			.get(header::CONTENT_LENGTH)
+			.map(|value| value.to_str().ok())
+			.flatten()
+		{
+			if let Ok(value) = length.parse::<u128>() {
+				return value;
 			}
 		}
-		self.body.len() as u128
+		let size_hint = self.hyper_request.body().size_hint();
+		size_hint.upper().unwrap_or(size_hint.lower()).into()
 	}
 
 	pub fn get_path(&self) -> String {
-		self.uri.path().to_string()
+		self.hyper_request.uri().path().to_string()
 	}
 
 	pub fn get_full_url(&self) -> String {
-		self.uri.to_string()
+		self.hyper_request.uri().to_string()
 	}
 
 	pub fn get_origin(&self) -> Option<String> {
 		Some(format!(
 			"{}://{}",
-			self.uri.scheme_str()?,
-			self.uri.authority()?
+			self.hyper_request.uri().scheme_str()?,
+			self.hyper_request.uri().authority()?
 		))
 	}
 
 	pub fn get_query_string(&self) -> String {
-		self.uri.query().unwrap_or("").to_string()
+		self.hyper_request.uri().query().unwrap_or("").to_string()
 	}
 
 	pub fn get_host(&self) -> String {
-		self.uri.host().map(String::from).unwrap_or_else(|| {
-			self.get_header("host").unwrap_or_else(|| "".to_string())
-		})
+		self.hyper_request
+			.uri()
+			.host()
+			.map(String::from)
+			.unwrap_or_else(|| {
+				self.get_header("host").unwrap_or_else(|| "".to_string())
+			})
 	}
 
 	pub fn get_host_and_port(&self) -> String {
 		format!(
 			"{}{}",
-			self.uri.host().unwrap(),
-			if let Some(port) = self.uri.port_u16() {
+			self.hyper_request.uri().host().unwrap(),
+			if let Some(port) = self.hyper_request.uri().port_u16() {
 				format!(":{}", port)
 			} else {
 				String::new()
@@ -153,8 +167,13 @@ impl Request {
 	}
 
 	pub fn get_protocol(&self) -> String {
-		// TODO support X-Forwarded-Proto
-		self.uri.scheme_str().unwrap_or("http").to_string()
+		// TODO confirm support for X-Forwarded-Proto
+		self.hyper_request
+			.uri()
+			.scheme_str()
+			.or(self.get_header("X-Forwarded-Proto").as_deref())
+			.unwrap_or("http")
+			.to_string()
 	}
 
 	pub fn is_secure(&self) -> bool {
@@ -174,58 +193,60 @@ impl Request {
 	// See: https://koajs.com/#request content negotiation
 
 	pub fn get_version(&self) -> String {
-		format!("{}.{}", self.version.0, self.version.1)
+		match self.hyper_request.version() {
+			Version::HTTP_09 => "0.9",
+			Version::HTTP_10 => "1.0",
+			Version::HTTP_11 => "1.1",
+			Version::HTTP_2 => "2.0",
+			Version::HTTP_3 => "3.0",
+			_ => "0.0",
+		}
+		.to_string()
 	}
 
 	pub fn get_version_major(&self) -> u8 {
-		self.version.0
+		match self.hyper_request.version() {
+			Version::HTTP_09 => 0,
+			Version::HTTP_10 | Version::HTTP_11 => 1,
+			Version::HTTP_2 => 2,
+			Version::HTTP_3 => 3,
+			_ => 0,
+		}
 	}
 
 	pub fn get_version_minor(&self) -> u8 {
-		self.version.1
+		match self.hyper_request.version() {
+			Version::HTTP_09 => 9,
+			Version::HTTP_10 | Version::HTTP_2 | Version::HTTP_3 => 0,
+			Version::HTTP_11 => 1,
+			_ => 0,
+		}
 	}
 
 	pub fn get_header(&self, field: &str) -> Option<String> {
-		self.headers.iter().find_map(|(key, value)| {
-			if key.to_lowercase() == field.to_lowercase() {
-				Some(value.join("\n"))
-			} else {
-				None
-			}
-		})
+		self.hyper_request
+			.headers()
+			.iter()
+			.find_map(|(key, value)| {
+				if key.as_str().to_lowercase() == field.to_lowercase() {
+					value.to_str().map(String::from).ok()
+				} else {
+					None
+				}
+			})
 	}
-	pub fn get_headers(&self) -> &HashMap<String, Vec<String>> {
-		&self.headers
-	}
-	pub fn set_header(&mut self, field: &str, value: &str) {
-		self.headers
-			.insert(field.to_string(), vec![value.to_string()]);
-	}
-	pub fn append_header(&mut self, key: String, value: String) {
-		if let Some(headers) = self.headers.get_mut(&key) {
-			headers.push(value);
-		} else {
-			self.headers.insert(key, vec![value]);
-		}
-	}
-	pub fn remove_header(&mut self, field: &str) {
-		self.headers.remove(field);
-	}
-
-	pub fn get_query(&self) -> &HashMap<String, String> {
-		&self.query
+	pub fn get_headers(&self) -> HashMap<String, Vec<String>> {
+		self.hyper_request
+			.headers()
+			.iter()
+			.filter_map(|(key, value)| {
+				Some((key.to_string(), vec![value.to_str().ok()?.to_string()]))
+			})
+			.collect()
 	}
 
 	pub fn get_params(&self) -> &HashMap<String, String> {
 		&self.params
-	}
-
-	pub fn get_cookies(&self) -> &Vec<Cookie> {
-		&self.cookies
-	}
-
-	pub fn get_cookie(&self, name: &str) -> Option<&Cookie> {
-		self.cookies.iter().find(|cookie| cookie.key == name)
 	}
 
 	pub fn get_hyper_request(&self) -> &HyperRequest {
@@ -237,26 +258,13 @@ impl Request {
 	}
 }
 
-#[cfg(debug_assertions)]
 impl Debug for Request {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-		f.debug_struct("Request")
-			.field("socket_addr", &self.socket_addr)
-			.field("body", &self.body)
-			.field("method", &self.method)
-			.field("uri", &self.uri)
-			.field("version", &self.version)
-			.field("headers", &self.headers)
-			.field("query", &self.query)
-			.field("params", &self.params)
-			.field("cookies", &self.cookies)
-			.finish()
-	}
-}
-
-#[cfg(not(debug_assertions))]
-impl Debug for Request {
-	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-		write!(f, "[Request {} {}]", self.method, self.get_path())
+		write!(
+			f,
+			"[Request {} {}]",
+			self.get_method().to_string(),
+			self.get_path()
+		)
 	}
 }

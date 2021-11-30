@@ -1,25 +1,63 @@
 use std::{
-	collections::HashMap,
+	convert::TryFrom,
 	fmt::{Debug, Formatter, Result as FmtResult},
 };
 
 use chrono::Local;
+use hyper::{
+	body::{Bytes, Sender as HyperSender},
+	header::{HeaderName, HeaderValue},
+	Body,
+	HeaderMap,
+};
+use tokio::sync::mpsc::UnboundedSender as MpscSender;
 
-use crate::Cookie;
+#[derive(Debug)]
+pub(crate) enum PreBodySenderData {
+	Status(u16),
+	SetHeader(HeaderName, HeaderValue),
+	RemoveHeader(HeaderName),
+	ClearHeaders,
+	Body(Body),
+}
 
-#[derive(Clone)]
+pub(crate) enum ResponseState {
+	PreBody {
+		header_sender: MpscSender<PreBodySenderData>,
+	},
+	PostBody {
+		body_sender: HyperSender,
+	},
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum ResponseError {
+	#[error("status cannot be set after body as been sent")]
+	StatusAfterBody,
+	#[error("headers cannot be set after body as been sent")]
+	HeaderAfterBody,
+	#[error("invalid name `{0}`. Please try to keep your header names to lowercase ASCII characters")]
+	InvalidHeaderName(String),
+	#[error("invalid value for header name `{0}`. Please try to keep your headers to printable ASCII characters")]
+	InvalidHeaderValue(String),
+	#[error("an unknown error occured")]
+	UnknownError {
+		inner: Option<Box<dyn std::error::Error + Send + Sync>>,
+	},
+}
+
 pub struct Response {
-	pub(crate) body: Vec<u8>,
 	pub(crate) status: u16,
-	pub(crate) headers: HashMap<String, Vec<String>>,
+	pub(crate) headers: HeaderMap,
+	pub(crate) response_state: ResponseState,
 }
 
 impl Response {
-	pub fn new() -> Self {
+	pub(crate) fn new(header_sender: MpscSender<PreBodySenderData>) -> Self {
 		Response {
-			body: vec![],
 			status: 200,
-			headers: HashMap::new(),
+			headers: HeaderMap::new(),
+			response_state: ResponseState::PreBody { header_sender },
 		}
 	}
 
@@ -89,40 +127,92 @@ impl Response {
 			_ => "unknown",
 		}
 	}
-	pub fn set_status(&mut self, code: u16) {
-		self.status = code;
-	}
-
-	pub fn set_content_length(&mut self, length: usize) {
-		self.set_header("content-length", &format!("{}", length));
-	}
-
-	pub fn get_headers(&self) -> &HashMap<String, Vec<String>> {
-		&self.headers
-	}
-	pub fn get_header(&self, field: &str) -> Option<String> {
-		self.headers.iter().find_map(|(key, value)| {
-			if key.to_lowercase() == field.to_lowercase() {
-				Some(value.join("\n"))
-			} else {
-				None
-			}
-		})
-	}
-	pub fn set_header(&mut self, key: &str, value: &str) {
-		self.headers
-			.insert(key.to_string(), vec![value.to_string()]);
-	}
-	pub fn append_header(&mut self, key: &str, value: &str) {
-		if let Some(headers) = self.headers.get_mut(key) {
-			headers.push(value.to_string());
+	pub fn set_status(&mut self, code: u16) -> Result<(), ResponseError> {
+		if let ResponseState::PreBody { header_sender } =
+			&mut self.response_state
+		{
+			header_sender
+				.send(PreBodySenderData::Status(code))
+				.map_err(|err| ResponseError::UnknownError {
+					inner: Some(Box::new(err)),
+				})?;
 		} else {
-			self.headers
-				.insert(key.to_string(), vec![value.to_string()]);
+			return Err(ResponseError::StatusAfterBody);
 		}
+		self.status = code;
+		Ok(())
 	}
-	pub fn remove_header(&mut self, field: &str) {
-		self.headers.remove(field);
+
+	pub fn set_content_length(
+		&mut self,
+		length: usize,
+	) -> Result<(), ResponseError> {
+		self.set_header("content-length", &format!("{}", length))
+	}
+
+	pub fn get_header(&self, field: &str) -> Option<String> {
+		self.headers
+			.get(field)
+			.map(|value| value.to_str().ok())
+			.flatten()
+			.map(String::from)
+	}
+	pub fn set_header(
+		&mut self,
+		key: &str,
+		value: &str,
+	) -> Result<(), ResponseError> {
+		if let ResponseState::PreBody { header_sender } =
+			&mut self.response_state
+		{
+			header_sender
+				.send(PreBodySenderData::SetHeader(
+					HeaderName::try_from(key).map_err(|_| {
+						ResponseError::InvalidHeaderName(key.to_string())
+					})?,
+					HeaderValue::from_str(value).map_err(|_| {
+						ResponseError::InvalidHeaderValue(key.to_string())
+					})?,
+				))
+				.map_err(|err| ResponseError::UnknownError {
+					inner: Some(Box::new(err)),
+				})?;
+		} else {
+			return Err(ResponseError::HeaderAfterBody);
+		}
+		Ok(())
+	}
+	pub fn remove_header(&mut self, key: &str) -> Result<(), ResponseError> {
+		if let ResponseState::PreBody { header_sender } =
+			&mut self.response_state
+		{
+			header_sender
+				.send(PreBodySenderData::RemoveHeader(
+					HeaderName::try_from(key).map_err(|_| {
+						ResponseError::InvalidHeaderName(key.to_string())
+					})?,
+				))
+				.map_err(|err| ResponseError::UnknownError {
+					inner: Some(Box::new(err)),
+				})?;
+		} else {
+			return Err(ResponseError::HeaderAfterBody);
+		}
+		Ok(())
+	}
+	pub async fn clear_headers(&mut self) -> Result<(), ResponseError> {
+		if let ResponseState::PreBody { header_sender } =
+			&mut self.response_state
+		{
+			header_sender
+				.send(PreBodySenderData::ClearHeaders)
+				.map_err(|err| ResponseError::UnknownError {
+					inner: Some(Box::new(err)),
+				})?;
+		} else {
+			return Err(ResponseError::HeaderAfterBody);
+		}
+		Ok(())
 	}
 
 	pub fn get_content_type(&self) -> String {
@@ -131,18 +221,22 @@ impl Response {
 			.unwrap_or_else(|| "text/plain".to_string());
 		c_type.split(';').next().unwrap_or("").to_string()
 	}
-	pub fn set_content_type(&mut self, content_type: &str) {
-		self.set_header("Content-Type", content_type);
+	pub fn set_content_type(
+		&mut self,
+		content_type: &str,
+	) -> Result<(), ResponseError> {
+		self.set_header("Content-Type", content_type)
 	}
 
-	pub fn redirect(&mut self, url: &str) {
-		if self.status == 200 {
-			self.set_status(302);
-		}
-		self.set_header("Location", url);
+	pub fn redirect(&mut self, url: &str) -> Result<(), ResponseError> {
+		self.set_status(302)?;
+		self.set_header("Location", url)
 	}
 
-	pub fn attachment(&mut self, file_name: Option<&str>) {
+	pub fn attachment(
+		&mut self,
+		file_name: Option<&str>,
+	) -> Result<(), ResponseError> {
 		self.set_header(
 			"Content-Disposition",
 			&format!(
@@ -153,57 +247,83 @@ impl Response {
 					String::new()
 				}
 			),
-		);
+		)
 	}
 
 	pub fn get_last_modified(&self) -> Option<String> {
 		self.get_header("Last-Modified")
 	}
-	pub fn set_last_modified(&mut self, last_modified: &str) {
-		self.set_header("Last-Modified", last_modified);
+	pub fn set_last_modified(
+		&mut self,
+		last_modified: &str,
+	) -> Result<(), ResponseError> {
+		self.set_header("Last-Modified", last_modified)
 	}
 
-	pub fn set_etag(&mut self, etag: &str) {
-		self.set_header("ETag", etag);
+	pub fn set_etag(&mut self, etag: &str) -> Result<(), ResponseError> {
+		self.set_header("ETag", etag)
 	}
 
-	pub fn get_body(&self) -> &Vec<u8> {
-		&self.body
+	pub async fn set_body(&mut self, data: &str) -> Result<(), ResponseError> {
+		self.set_body_bytes(data.as_bytes()).await
 	}
-	pub fn set_body(&mut self, data: &str) {
-		self.set_body_bytes(data.as_bytes());
+	pub async fn set_body_bytes(
+		&mut self,
+		data: &[u8],
+	) -> Result<(), ResponseError> {
+		self.set_content_length(data.len())?;
+		self.set_header("date", &Local::now().to_rfc2822())?;
+
+		self.append_body_bytes(data).await
 	}
-	pub fn set_body_bytes(&mut self, data: &[u8]) {
-		self.body = data.to_vec();
-		self.set_content_length(data.len());
-		self.set_header("date", &Local::now().to_rfc2822());
+	pub async fn append_body(
+		&mut self,
+		data: &str,
+	) -> Result<(), ResponseError> {
+		self.append_body_bytes(data.as_bytes()).await
+	}
+	pub async fn append_body_bytes(
+		&mut self,
+		data: &[u8],
+	) -> Result<(), ResponseError> {
+		match &mut self.response_state {
+			ResponseState::PreBody { header_sender } => {
+				let (mut sender, body) = Body::channel();
+				header_sender.send(PreBodySenderData::Body(body)).map_err(
+					|err| ResponseError::UnknownError {
+						inner: Some(Box::new(err)),
+					},
+				)?;
+				sender
+					.send_data(Bytes::copy_from_slice(data))
+					.await
+					.map_err(|err| ResponseError::UnknownError {
+						inner: Some(Box::new(err)),
+					})?;
+				self.response_state = ResponseState::PostBody {
+					body_sender: sender,
+				};
+			}
+			ResponseState::PostBody { body_sender } => {
+				body_sender
+					.send_data(Bytes::copy_from_slice(data))
+					.await
+					.map_err(|err| ResponseError::UnknownError {
+						inner: Some(Box::new(err)),
+					})?;
+			}
+		}
+		Ok(())
 	}
 
-	pub fn set_cookie(&mut self, cookie: Cookie) {
-		self.append_header("Set-Cookie", &cookie.to_header_string());
-	}
+	// TODO
+	// pub fn set_cookie(&mut self, cookie: Cookie) {
+	// 	self.append_header("Set-Cookie", &cookie.to_header_string());
+	// }
 }
 
 impl Debug for Response {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-		if cfg!(debug_assertions) {
-			f.debug_struct("Request")
-				.field("body", &self.body)
-				.field("status", &self.status)
-				.field("headers", &self.headers)
-				.finish()
-		} else {
-			write!(f, "[Response {}]", self.status)
-		}
-	}
-}
-
-impl Default for Response {
-	fn default() -> Self {
-		Response {
-			body: vec![],
-			status: 200,
-			headers: HashMap::new(),
-		}
+		write!(f, "[Response {}]", self.status)
 	}
 }
