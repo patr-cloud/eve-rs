@@ -6,24 +6,24 @@ pub struct RequestHeaders {
 	pub a_im: String,
 	pub accept: Vec<MimeType>,
 	pub accept_charset: Vec<Charset>,
-	pub accept_datetime: chrono::DateTime<chrono::Local>,
+	pub accept_datetime: chrono::DateTime<chrono::Utc>,
 	pub accept_encoding: Vec<Encoding>,
 	pub accept_language: Vec<Locale>,
 	pub access_control_request_method: HttpMethod,
 	pub access_control_request_headers: Vec<String>,
 	pub authorization: Authorization,
-	pub cache_control: 
-	pub connection: 
-	pub content_encoding: 
-	pub content_length: 
-	pub content_md5: 
-	pub content_type: 
-	pub cookie: 
-	pub date: 
-	pub expect: 
-	pub forwarded: 
-	pub from: 
-	pub host: 
+	pub cache_control: CacheControl,
+	pub connection: Connection,
+	pub content_encoding: ContentEncoding,
+	pub content_length: u64,
+	pub content_md5: String,
+	pub content_type: MimeType,
+	pub cookie: Cookie,
+	pub date: chrono::DateTime<chrono::Utc>,
+	pub expect: String,
+	pub forwarded: ForwardedHeaderValue,
+	pub from: String,
+	pub host: String,
 	pub http2_settings: 
 	pub if_match: 
 	pub if_modified_since: 
