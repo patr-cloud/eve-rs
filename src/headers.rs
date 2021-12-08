@@ -62,6 +62,18 @@ pub struct RequestHeaders {
 	pub save_data: 
 }
 
+pub enum Authorization {
+	Basic {
+		username: String,
+		password: String,
+	},
+	Bearer {
+		token: String,
+	},
+	Unknown(String),
+	None,
+}
+
 pub struct Headers {
 	pub accept: String,
 	pub accept_charset: String,
