@@ -140,12 +140,15 @@ where
 		self.error_handler = None;
 	}
 
-	pub fn get<const MIDDLEWARE_LENGTH: usize>(
+	pub fn get<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
+			let handler = handler.into();
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
 				handler.clone(),
@@ -156,100 +159,143 @@ where
 		});
 	}
 
-	pub fn post<const MIDDLEWARE_LENGTH: usize>(
+	pub fn post<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
-			self.post_stack
-				.push(MiddlewareHandler::new(path, handler, true));
+			self.post_stack.push(MiddlewareHandler::new(
+				path,
+				handler.into(),
+				true,
+			));
 		});
 	}
 
-	pub fn put<const MIDDLEWARE_LENGTH: usize>(
+	pub fn put<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
-			self.put_stack
-				.push(MiddlewareHandler::new(path, handler, true));
+			self.put_stack.push(MiddlewareHandler::new(
+				path,
+				handler.into(),
+				true,
+			));
 		});
 	}
 
-	pub fn delete<const MIDDLEWARE_LENGTH: usize>(
+	pub fn delete<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
-			self.delete_stack
-				.push(MiddlewareHandler::new(path, handler, true));
+			self.delete_stack.push(MiddlewareHandler::new(
+				path,
+				handler.into(),
+				true,
+			));
 		});
 	}
 
-	pub fn head<const MIDDLEWARE_LENGTH: usize>(
+	pub fn head<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
-			self.head_stack
-				.push(MiddlewareHandler::new(path, handler, true));
+			self.head_stack.push(MiddlewareHandler::new(
+				path,
+				handler.into(),
+				true,
+			));
 		});
 	}
 
-	pub fn options<const MIDDLEWARE_LENGTH: usize>(
+	pub fn options<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
-			self.options_stack
-				.push(MiddlewareHandler::new(path, handler, true));
+			self.options_stack.push(MiddlewareHandler::new(
+				path,
+				handler.into(),
+				true,
+			));
 		});
 	}
 
-	pub fn connect<const MIDDLEWARE_LENGTH: usize>(
+	pub fn connect<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
-			self.connect_stack
-				.push(MiddlewareHandler::new(path, handler, true));
+			self.connect_stack.push(MiddlewareHandler::new(
+				path,
+				handler.into(),
+				true,
+			));
 		});
 	}
 
-	pub fn patch<const MIDDLEWARE_LENGTH: usize>(
+	pub fn patch<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
-			self.patch_stack
-				.push(MiddlewareHandler::new(path, handler, true));
+			self.patch_stack.push(MiddlewareHandler::new(
+				path,
+				handler.into(),
+				true,
+			));
 		});
 	}
 
-	pub fn trace<const MIDDLEWARE_LENGTH: usize>(
+	pub fn trace<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
-			self.trace_stack
-				.push(MiddlewareHandler::new(path, handler, true));
+			self.trace_stack.push(MiddlewareHandler::new(
+				path,
+				handler.into(),
+				true,
+			));
 		});
 	}
 
-	pub fn use_middleware<const MIDDLEWARE_LENGTH: usize>(
+	pub fn use_middleware<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
-	) {
+		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
+	) where
+		IntoMiddleware: Into<TMiddleware>,
+	{
 		IntoIter::new(middlewares).for_each(|handler| {
+			let handler = handler.into();
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
 				handler.clone(),

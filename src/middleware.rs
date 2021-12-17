@@ -63,6 +63,10 @@ where
 	) -> Self {
 		DefaultMiddleware { handler, data }
 	}
+
+	pub fn get_data(&self) -> &TData {
+		&self.data
+	}
 }
 
 #[async_trait::async_trait]

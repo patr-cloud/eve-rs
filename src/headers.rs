@@ -6,7 +6,7 @@ pub struct RequestHeaders {
 	pub a_im: String,
 	pub accept: Vec<MimeType>,
 	pub accept_charset: Vec<Charset>,
-	pub accept_datetime: chrono::DateTime<chrono::Utc>,
+	pub accept_datetime: DateTime<Utc>,
 	pub accept_encoding: Vec<Encoding>,
 	pub accept_language: Vec<Locale>,
 	pub access_control_request_method: HttpMethod,
@@ -19,47 +19,47 @@ pub struct RequestHeaders {
 	pub content_md5: String,
 	pub content_type: MimeType,
 	pub cookie: Cookie,
-	pub date: chrono::DateTime<chrono::Utc>,
+	pub date: DateTime<Utc>,
 	pub expect: String,
 	pub forwarded: ForwardedHeaderValue,
 	pub from: String,
 	pub host: String,
-	pub http2_settings: 
-	pub if_match: 
-	pub if_modified_since: 
-	pub if_none_match: 
-	pub if_range: 
-	pub if_unmodified_since: 
-	pub max_forwards: 
-	pub origin: 
-	pub pragma: 
-	pub prefer: 
-	pub proxy_authorization: 
-	pub range: 
-	pub referer: 
-	pub te: 
-	pub trailer: 
-	pub transfer_encoding: 
-	pub user_agent: 
-	pub upgrade: 
-	pub via: 
-	pub warning: 
-	pub upgrade_insecure_requests: 
-	pub x_requested_with: 
-	pub dnt: 
-	pub x_forwarded_for: 
-	pub x_forwarded_host: 
-	pub x_forwarded_proto: 
-	pub front_end_https: 
-	pub x_http_method_override: 
-	pub x_att_deviceid: 
-	pub x_wap_profile: 
-	pub proxy_connection: 
-	pub x_uidh: 
-	pub x_csrf_token: 
-	pub x_request_id: 
-	pub x_correlation_id: 
-	pub save_data: 
+	pub http2_settings: String,
+	pub if_match: String,
+	pub if_modified_since: DateTime<Utc>,
+	pub if_none_match: String,
+	pub if_range: String,
+	pub if_unmodified_since: DateTime<Utc>,
+	pub max_forwards: usize,
+	pub origin: Url,
+	pub pragma: String,
+	pub prefer: String,
+	pub proxy_authorization: Authorization,
+	pub range: RangeHeader,
+	pub referer: Url,
+	pub te: Vec<String>,
+	pub trailer: Trailer,
+	pub transfer_encoding: Encoding,
+	pub user_agent: UserAgent,
+	pub upgrade: Upgrade,
+	pub via: Vec<String>,
+	pub warning: String,
+	pub upgrade_insecure_requests: bool,
+	pub x_requested_with: String,
+	pub dnt: bool,
+	pub x_forwarded_for: ForwardedHeaderValue,
+	pub x_forwarded_host: String,
+	pub x_forwarded_proto: String,
+	pub front_end_https: bool,
+	pub x_http_method_override: Method,
+	pub x_att_deviceid: String,
+	pub x_wap_profile: Url,
+	pub proxy_connection: Connection,
+	pub x_uidh: String,
+	pub x_csrf_token: String,
+	pub x_request_id: String,
+	pub x_correlation_id: String,
+	pub save_data: bool,
 }
 
 pub enum Authorization {
@@ -72,6 +72,83 @@ pub enum Authorization {
 	},
 	Unknown(String),
 	None,
+}
+
+impl Authorization {
+	pub fn is_none(&self) -> bool {
+		match self {
+			Self::None => true,
+			_ => false,
+		}
+	}
+
+	pub fn is_basic(&self) -> bool {
+		match self {
+			Self::Basic { .. } => true,
+			_ => false,
+		}
+	}
+
+	pub fn as_basic(&self) -> Option<(&str, &str)> {
+		match self {
+			Self::Basic { username, password } => Some((username, password)),
+			_ => None,
+		}
+	}
+
+	pub fn is_bearer(&self) -> bool {
+		match self {
+			Self::Bearer { .. } => true,
+			_ => false,
+		}
+	}
+
+	pub fn as_bearer(&self) -> Option<&str> {
+		match self {
+			Self::Bearer { token } => Some(token),
+			_ => None,
+		}
+	}
+
+	pub fn is_unknown(&self) -> bool {
+		match self {
+			Self::Unknown(_) => true,
+			_ => false,
+		}
+	}
+
+	pub fn as_unknown(&self) -> Option<&str> {
+		match self {
+			Self::Unknown(token) => Some(token),
+			_ => None,
+		}
+	}
+}
+
+pub enum RangeUnit {
+	Bytes,
+	Other(String)
+}
+
+impl RangeUnit {
+	pub fn as_str(&self) -> &str {
+		match self {
+			Self::Bytes => "bytes",
+			Self::Other(unit) => unit,
+		}
+	}
+
+	pub fn is_bytes(&self) -> bool {
+		match self {
+			Self::Bytes => true,
+			_ => false,
+		}
+	}
+}
+
+pub struct RangeHeader {
+	pub unit: RangeUnit,
+	pub ranges: Vec<Range<u64>>, // Maybe explore: https://github.com/bancek/rust-http-range
 }
 
 pub struct Headers {
