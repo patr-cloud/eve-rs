@@ -89,9 +89,8 @@ where
 		// A-Z, 0-9, '_'
 		regex_path = Regex::new(":(?P<var>([a-zA-Z0-9_]+))")
 			.unwrap()
-			// Match that variable with anything that has a-z, A-Z, 0-9, '_',
-			// '.' and a '-'
-			.replace_all(&regex_path, "(?P<$var>([a-zA-Z0-9_\\.-]+))")
+			// Match that variable with anything that isn't a `/`
+			.replace_all(&regex_path, "(?P<$var>(([^\\/].)+))")
 			.to_string();
 
 		if regex_path != "/" {

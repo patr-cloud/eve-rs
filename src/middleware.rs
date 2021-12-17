@@ -42,6 +42,7 @@ where
 	TData: Default + Clone + Send + Sync,
 {
 	handler: DefaultMiddlewareHandler,
+	#[allow(dead_code)]
 	data: TData,
 }
 
