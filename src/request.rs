@@ -69,7 +69,7 @@ impl Request {
 			vec![]
 		};
 		while let Some(data) = body.data().await {
-			let data = data.map_err(|err| RequestError::Io(err))?;
+			let data = data.map_err(RequestError::Io)?;
 			if bytes.len() + data.len() >= max_length {
 				return Err(RequestError::PayloadTooLarge { max_length });
 			}
@@ -103,7 +103,7 @@ impl Request {
 			}
 		}
 		let size_hint = self.hyper_request.body().size_hint();
-		size_hint.upper().unwrap_or(size_hint.lower()).into()
+		size_hint.upper().unwrap_or_else(|| size_hint.lower()).into()
 	}
 
 	pub fn get_path(&self) -> String {

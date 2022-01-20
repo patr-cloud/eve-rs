@@ -457,7 +457,7 @@ where
 		context: TContext,
 	) -> Result<TContext, Error<TErrorData>> {
 		let method = context.get_method();
-		let stack = self.get_middleware_stack(&method, context.get_path());
+		let stack = self.get_middleware_stack(method, context.get_path());
 		chained_run(context, Arc::new(stack), 0).await
 	}
 
