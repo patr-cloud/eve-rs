@@ -4,6 +4,7 @@ use std::{
 	ops::{Deref, DerefMut},
 };
 
+#[derive(Debug)]
 pub struct Error<TErrorData>
 where
 	TErrorData: Default,
@@ -18,7 +19,7 @@ impl<TErrorData> Error<TErrorData>
 where
 	TErrorData: Default,
 {
-	pub fn new(error: Box<dyn StdError + Send + Sync>) -> Error<TErrorData> {
+	pub fn new(error: Box<dyn StdError + Send + Sync>) -> Self {
 		Error {
 			body: None,
 			status: None,
@@ -39,7 +40,7 @@ where
 		}
 	}
 
-	pub fn empty() -> Error<TErrorData> {
+	pub fn empty() -> Self {
 		Error {
 			body: None,
 			status: None,
@@ -48,7 +49,7 @@ where
 		}
 	}
 
-	pub fn as_result<TValue>() -> Result<TValue, Error<TErrorData>> {
+	pub fn as_result<TValue>() -> Result<TValue, Self> {
 		Err(Error::empty())
 	}
 
@@ -56,7 +57,7 @@ where
 		self.status
 	}
 
-	pub fn status(mut self, status: u16) -> Error<TErrorData> {
+	pub fn status(mut self, status: u16) -> Self {
 		self.status = Some(status);
 		self
 	}
