@@ -70,7 +70,7 @@ pub async fn listen<
 						let app = app.clone();
 						async move {
 							let request =
-								Request::from_hyper(remote_addr, req).await;
+								Request::from_hyper(remote_addr, req);
 							let mut context = app.generate_context(request);
 							context.header("Server", "Eve");
 

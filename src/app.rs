@@ -64,7 +64,7 @@ where
 			let path = context.get_path();
 			context
 				.status(404)
-				.body(&format!("Cannot {} route {}", method, path));
+				.body(format!("Cannot {} route {}", method, path));
 			Ok(context)
 		}
 	})

@@ -1,8 +1,11 @@
 use std::fmt::Debug;
 
-use tokio::fs;
+use futures::TryFutureExt;
+use hyper::Body;
+use tokio::fs::{self, File};
+use tokio_util::codec::{BytesCodec, FramedRead};
 
-use crate::{AsError, Context, Error, Middleware, NextHandler};
+use crate::{Context, Error, Middleware, NextHandler};
 
 #[derive(Clone)]
 pub struct StaticFileServer {
@@ -33,11 +36,14 @@ impl StaticFileServer {
 		let file_location =
 			format!("{}{}", self.folder_path, context.get_path());
 		if is_file(&file_location).await {
-			let content = fs::read(file_location)
-				.await
-				.status(500)
-				.body("Internal server error")?;
-			context.body_bytes(&content);
+			let stream = File::open(file_location)
+				.map_ok(|file| FramedRead::new(file, BytesCodec::new()))
+				.await.expect("File open should succeed as it has already met precondition");
+
+			context
+				.get_response_mut()
+				.set_body(Body::wrap_stream(stream));
+
 			Ok(context)
 		} else {
 			next(context).await
