@@ -4,19 +4,17 @@ use serde_json::Value;
 
 use crate::{AsError, Context, DefaultMiddleware, Error};
 
-pub fn parser<TContext, TErrorData>(
-	context: &TContext,
+pub async fn parser<TContext, TErrorData>(
+	context: &mut TContext,
 ) -> Result<Option<Value>, Error<TErrorData>>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
 	TErrorData: Default + Send + Sync,
+	TContext::ResBodyBuffer: AsRef<[u8]>,
 {
 	if context.is(&["application/json"]) {
-		let body = context
-			.get_request()
-			.get_body()
-			.unwrap_or_else(|_| "None".to_string());
-		let value = serde_json::from_str(&body)
+		let body = context.get_buffered_request_body().await;
+		let value = serde_json::from_slice(body.as_ref())
 			.status(400)
 			.body("Bad request")?;
 		Ok(Some(value))
@@ -31,7 +29,7 @@ where
 {
 	DefaultMiddleware::new(|mut context, next| {
 		Box::pin(async move {
-			let json = parser(&context)?;
+			let json = parser(&mut context).await?;
 
 			if let Some(json) = json {
 				context.set_body_object(json);

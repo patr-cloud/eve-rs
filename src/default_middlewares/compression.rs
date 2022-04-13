@@ -20,7 +20,8 @@ impl CompressionHandler {
 		}
 	}
 
-	pub fn compress<TContext>(&mut self, context: &mut TContext)
+	// TODO: Need to use async-compression crate for compressing on-demand
+	pub async fn compress<TContext>(&mut self, context: &mut TContext)
 	where
 		TContext: Context + Debug + Send + Sync,
 	{
@@ -34,27 +35,35 @@ impl CompressionHandler {
 			.collect::<Vec<&str>>();
 
 		if allowed_encodings.contains(&"gzip") {
-			let data = context.get_response().get_body();
+			let data =
+				hyper::body::to_bytes(context.get_response_mut().take_body())
+					.await
+					.unwrap();
 			let mut output = vec![];
 			let result = GzBuilder::new()
 				.buf_read(data.as_ref(), self.compression_level)
 				.read_to_end(&mut output);
 			if result.is_ok() {
 				context
-					.body_bytes(&output)
-					.header("Content-Encoding", "gzip");
+					.header("Content-Encoding", "gzip")
+					.get_response_mut()
+					.set_body(output);
 			}
 		} else if allowed_encodings.contains(&"deflate") {
-			let data = context.get_response().get_body();
-			let mut output = [];
+			let data =
+				hyper::body::to_bytes(context.get_response_mut().take_body())
+					.await
+					.unwrap();
+			let mut output = vec![];
 			if let Ok(Status::Ok) = self.zlib_compressor.compress(
-				data,
+				data.as_ref(),
 				&mut output,
 				FlushCompress::None,
 			) {
 				context
-					.body_bytes(&output)
-					.header("Content-Encoding", "deflate");
+					.header("Content-Encoding", "deflate")
+					.get_response_mut()
+					.set_body(output);
 			}
 		}
 	}
@@ -78,7 +87,7 @@ where
 
 			context = next(context).await?;
 
-			compressor.compress(&mut context);
+			compressor.compress(&mut context).await;
 
 			Ok(context)
 		})

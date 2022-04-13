@@ -3,13 +3,12 @@ use std::{
 	fmt::{Debug, Formatter, Result as FmtResult},
 };
 
-use chrono::Local;
+use hyper::Body;
 
 use crate::Cookie;
 
-#[derive(Clone)]
 pub struct Response {
-	pub(crate) body: Vec<u8>,
+	pub(crate) body: Body,
 	pub(crate) status: u16,
 	pub(crate) headers: HashMap<String, Vec<String>>,
 }
@@ -17,7 +16,7 @@ pub struct Response {
 impl Response {
 	pub fn new() -> Self {
 		Response {
-			body: vec![],
+			body: Body::empty(),
 			status: 200,
 			headers: HashMap::new(),
 		}
@@ -167,16 +166,12 @@ impl Response {
 		self.set_header("ETag", etag);
 	}
 
-	pub fn get_body(&self) -> &Vec<u8> {
-		&self.body
+	pub fn take_body(&mut self) -> Body {
+		std::mem::take(&mut self.body)
 	}
-	pub fn set_body(&mut self, data: &str) {
-		self.set_body_bytes(data.as_bytes());
-	}
-	pub fn set_body_bytes(&mut self, data: &[u8]) {
-		self.body = data.to_vec();
-		self.set_content_length(data.len());
-		self.set_header("date", &Local::now().to_rfc2822());
+
+	pub fn set_body<T: Into<Body>>(&mut self, data: T) {
+		self.body = data.into();
 	}
 
 	pub fn set_cookie(&mut self, cookie: Cookie) {
@@ -201,7 +196,7 @@ impl Debug for Response {
 impl Default for Response {
 	fn default() -> Self {
 		Response {
-			body: vec![],
+			body: Body::default(),
 			status: 200,
 			headers: HashMap::new(),
 		}

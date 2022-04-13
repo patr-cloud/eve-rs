@@ -2,10 +2,10 @@ use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
 	net::{IpAddr, SocketAddr},
-	str::{self, Utf8Error},
+	str,
 };
 
-use hyper::{body, Body, Request as HyperRequestInternal, Uri, Version};
+use hyper::{Body, Request as HyperRequestInternal, Uri, Version};
 
 use crate::{cookie::Cookie, HttpMethod};
 
@@ -13,7 +13,7 @@ pub type HyperRequest = HyperRequestInternal<Body>;
 
 pub struct Request {
 	pub(crate) socket_addr: SocketAddr,
-	pub(crate) body: Vec<u8>,
+	pub(crate) body: Option<Body>,
 	pub(crate) method: HttpMethod,
 	pub(crate) uri: Uri,
 	pub(crate) version: (u8, u8),
@@ -21,11 +21,10 @@ pub struct Request {
 	pub(crate) query: HashMap<String, String>,
 	pub(crate) params: HashMap<String, String>,
 	pub(crate) cookies: Vec<Cookie>,
-	pub(crate) hyper_request: HyperRequest,
 }
 
 impl Request {
-	pub async fn from_hyper(
+	pub fn from_hyper(
 		socket_addr: SocketAddr,
 		req: HyperRequest,
 	) -> Self {
@@ -46,10 +45,9 @@ impl Request {
 				headers.insert(key.to_string(), vec![value]);
 			}
 		});
-		let body = body::to_bytes(hyper_body).await.unwrap().to_vec();
 		Request {
 			socket_addr,
-			body: body.clone(),
+			body: Some(hyper_body),
 			method: HttpMethod::from(parts.method.clone()),
 			uri: parts.uri.clone(),
 			version: match parts.version {
@@ -69,31 +67,32 @@ impl Request {
 			},
 			params: HashMap::new(),
 			cookies: vec![],
-			hyper_request: HyperRequest::from_parts(parts, Body::from(body)),
 		}
 	}
 
-	pub fn get_body_bytes(&self) -> &[u8] {
-		&self.body
-	}
-
-	pub fn get_body(&self) -> Result<String, Utf8Error> {
-		Ok(str::from_utf8(&self.body)?.to_string())
+	/// Returns the original body stream sent from client
+	///
+	/// For inspecting the body contents inside different middlewares,
+	/// it needs to be buffered somewhere in the context
+	///
+	///
+	/// # Panics
+	///
+	/// This method should be called only once during the entire lifecycle of a Request.
+	/// If this method is called more than once, then it will panic
+	pub fn take_body(&mut self) -> Body {
+		if let Some(body) = self.body.take() {
+			body
+		} else {
+			panic!(
+				"Body stream is already extracted from Request. \n\
+				If the body has to be consumed inside more than one middleware, it needs to be buffered somewhere in the context."
+			)
+		}
 	}
 
 	pub fn get_method(&self) -> &HttpMethod {
 		&self.method
-	}
-
-	pub fn get_length(&self) -> u128 {
-		if let Some(length) = self.headers.get("Content-Length") {
-			if let Some(value) = length.get(0) {
-				if let Ok(value) = value.parse::<u128>() {
-					return value;
-				}
-			}
-		}
-		self.body.len() as u128
 	}
 
 	pub fn get_path(&self) -> String {
@@ -226,14 +225,6 @@ impl Request {
 
 	pub fn get_cookie(&self, name: &str) -> Option<&Cookie> {
 		self.cookies.iter().find(|cookie| cookie.key == name)
-	}
-
-	pub fn get_hyper_request(&self) -> &HyperRequest {
-		&self.hyper_request
-	}
-
-	pub fn get_hyper_request_mut(&mut self) -> &mut HyperRequest {
-		&mut self.hyper_request
 	}
 }
 

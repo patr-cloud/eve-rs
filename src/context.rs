@@ -1,13 +1,13 @@
-use std::{
-	net::IpAddr,
-	str::{self, Utf8Error},
-};
+use std::{net::IpAddr, str};
 
+use async_trait::async_trait;
+use hyper::Body;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
 
+#[async_trait]
 pub trait Context {
 	fn get_request(&self) -> &Request;
 	fn get_request_mut(&mut self) -> &mut Request;
@@ -15,24 +15,22 @@ pub trait Context {
 	fn take_response(self) -> Response;
 	fn get_response_mut(&mut self) -> &mut Response;
 
-	fn get_body(&self) -> Result<String, Utf8Error> {
-		self.get_request().get_body()
-	}
+	// Buffered response body type
+	type ResBodyBuffer;
+	async fn get_buffered_request_body(&mut self) -> &Self::ResBodyBuffer;
+
 	fn json<TBody>(&mut self, body: TBody) -> &mut Self
 	where
 		TBody: Serialize,
 	{
 		self.content_type("application/json").body(
-			&serde_json::to_string(&body)
+			serde_json::to_string(&body)
 				.expect("unable to serialize body into JSON"),
 		)
 	}
-	fn body(&mut self, string: &str) -> &mut Self {
-		self.get_response_mut().set_body(string);
-		self
-	}
-	fn body_bytes(&mut self, bytes: &[u8]) -> &mut Self {
-		self.get_response_mut().set_body_bytes(bytes);
+
+	fn body<T: Into<Body>>(&mut self, data: T) -> &mut Self {
+		self.get_response_mut().set_body(data);
 		self
 	}
 
@@ -164,27 +162,30 @@ pub trait Context {
 pub struct DefaultContext {
 	request: Request,
 	response: Response,
-	body: Option<Value>,
+	buffered_request_body: Option<Vec<u8>>,
+	parsed_json: Option<Value>,
 }
 
 impl DefaultContext {
 	pub fn get_body_object(&self) -> Option<&Value> {
-		self.body.as_ref()
+		self.parsed_json.as_ref()
 	}
 
 	pub fn set_body_object(&mut self, body: Value) {
-		self.body = Some(body);
+		self.parsed_json = Some(body);
 	}
 
 	pub fn new(request: Request) -> Self {
 		DefaultContext {
 			request,
 			response: Default::default(),
-			body: None,
+			buffered_request_body: None,
+			parsed_json: None,
 		}
 	}
 }
 
+#[async_trait]
 impl Context for DefaultContext {
 	fn get_request(&self) -> &Request {
 		&self.request
@@ -204,6 +205,20 @@ impl Context for DefaultContext {
 
 	fn get_response_mut(&mut self) -> &mut Response {
 		&mut self.response
+	}
+
+	type ResBodyBuffer = Vec<u8>;
+	async fn get_buffered_request_body(&mut self) -> &Self::ResBodyBuffer {
+		match self.buffered_request_body {
+			Some(ref body) => body,
+			None => {
+				let body = hyper::body::to_bytes(self.request.take_body())
+					.await
+					.unwrap()
+					.to_vec();
+				self.buffered_request_body.get_or_insert(body)
+			}
+		}
 	}
 }
 
