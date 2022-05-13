@@ -2,28 +2,28 @@ use std::{fmt::Debug, marker::PhantomData};
 
 use regex::Regex;
 
-use crate::{Context, Middleware};
+use crate::{Context, Error, Middleware};
 
-pub(crate) struct MiddlewareHandler<TContext, TMiddleware, TErrorData>
+pub(crate) struct MiddlewareHandler<TContext, TMiddleware, TError>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
-	TErrorData: Default + Send + Sync,
+	TMiddleware: Middleware<TContext, TError> + Clone + Send + Sync,
+	TError: Error + Send + Sync,
 {
 	pub(crate) is_endpoint: bool,
 	pub(crate) mounted_url: String,
 	pub(crate) path_match: Regex,
 	pub(crate) handler: TMiddleware,
 	phantom_context: PhantomData<TContext>,
-	phantom_error: PhantomData<TErrorData>,
+	phantom_error: PhantomData<TError>,
 }
 
-impl<TContext, TMiddleware, TErrorData> Clone
-	for MiddlewareHandler<TContext, TMiddleware, TErrorData>
+impl<TContext, TMiddleware, TError> Clone
+	for MiddlewareHandler<TContext, TMiddleware, TError>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
-	TErrorData: Default + Send + Sync,
+	TMiddleware: Middleware<TContext, TError> + Clone + Send + Sync,
+	TError: Error + Send + Sync,
 {
 	fn clone(&self) -> Self {
 		MiddlewareHandler {
@@ -37,12 +37,12 @@ where
 	}
 }
 
-impl<TContext, TMiddleware, TErrorData>
-	MiddlewareHandler<TContext, TMiddleware, TErrorData>
+impl<TContext, TMiddleware, TError>
+	MiddlewareHandler<TContext, TMiddleware, TError>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
-	TErrorData: Default + Send + Sync,
+	TMiddleware: Middleware<TContext, TError> + Clone + Send + Sync,
+	TError: Error + Send + Sync,
 {
 	pub(crate) fn new(
 		path: &str,

@@ -6,35 +6,23 @@ use std::{
 
 use hyper::{
 	body::HttpBody,
-	header,
+	header::{self, HeaderName},
 	Body,
 	Request as HyperRequestInternal,
 	Version,
 };
+use serde::de::DeserializeOwned;
 
-use crate::HttpMethod;
+use crate::{error::EveError, HttpMethod};
 
 pub type HyperRequest = HyperRequestInternal<Body>;
-
-#[derive(thiserror::Error, Debug)]
-pub enum RequestError {
-	#[error("error occured while reading from the socket: {0}")]
-	Io(hyper::Error),
-	#[error("cannot parse body as it exceeded the max length of {max_length}")]
-	PayloadTooLarge { max_length: usize },
-	#[error("unable to parse body. Unknown format")]
-	BodyParse,
-	#[error("unable to parse body bytes as utf8")]
-	Utf8,
-	#[error("unknown method `{0}`")]
-	UnknownMethod(String),
-}
 
 pub struct Request {
 	pub(crate) socket_addr: SocketAddr,
 	pub(crate) hyper_request: HyperRequest,
 	pub(crate) method: HttpMethod,
 	pub(crate) params: HashMap<String, String>,
+	pub(crate) buffered_body: Option<Vec<u8>>,
 }
 
 impl Request {
@@ -50,10 +38,11 @@ impl Request {
 			hyper_request,
 			method,
 			params: HashMap::new(),
+			buffered_body: None,
 		}
 	}
 
-	pub async fn get_body_bytes(&mut self) -> Result<Vec<u8>, RequestError> {
+	pub async fn get_body_bytes(&mut self) -> Result<&[u8], EveError> {
 		self.get_body_bytes_with_max_length(Self::MAX_REQUEST_LENGTH)
 			.await
 	}
@@ -61,29 +50,55 @@ impl Request {
 	pub async fn get_body_bytes_with_max_length(
 		&mut self,
 		max_length: usize,
-	) -> Result<Vec<u8>, RequestError> {
+	) -> Result<&[u8], EveError> {
 		let body = self.hyper_request.body_mut();
-		let mut bytes = if let Some(length) = body.size_hint().upper() {
-			vec![0; length as usize]
-		} else {
-			vec![]
-		};
-		while let Some(data) = body.data().await {
-			let data = data.map_err(RequestError::Io)?;
-			if bytes.len() + data.len() >= max_length {
-				return Err(RequestError::PayloadTooLarge { max_length });
-			}
-			bytes.append(&mut data.to_vec());
+		// If there already is a body that's been buffered, return that.
+		let borrow = &mut self.buffered_body;
+		if let Some(data) = borrow {
+			return Ok(data.as_slice());
 		}
 
-		Ok(bytes)
+		// If there's no body buffered, create a new vec for the variable
+		// and read all data onto it until the max limit has been reached
+		let bytes = borrow.insert(Vec::with_capacity(
+			body.size_hint().upper().unwrap_or_default() as usize,
+		));
+		loop {
+			if bytes.len() >= max_length {
+				return Err(EveError::RequestPayloadTooLarge { max_length });
+			}
+			let data = if let Some(data) = body.data().await {
+				// There's more data in the stream. Include it in the buffer
+				data
+			} else {
+				// There's no more data in the stream. Return this value
+				break;
+			};
+			let data = data.map_err(EveError::RequestIo)?;
+			bytes.extend_from_slice(&mut data.as_ref());
+		}
+
+		Ok(bytes.as_slice())
 	}
 
-	pub async fn get_body(&mut self) -> Result<String, RequestError> {
+	pub async fn get_body(&mut self) -> Result<String, EveError> {
 		let body = self.get_body_bytes().await?;
-		let response =
-			String::from_utf8(body).map_err(|_| RequestError::Utf8)?;
+		let response = String::from_utf8(body.to_vec())
+			.map_err(|_| EveError::RequestBodyInvalidUtf8)?;
 		Ok(response)
+	}
+
+	pub async fn read_body_chunk(
+		&mut self,
+	) -> Result<Option<Vec<u8>>, EveError> {
+		self.hyper_request
+			.body_mut()
+			.data()
+			.await
+			.map(|data| {
+				data.map_err(EveError::RequestIo).map(|data| data.to_vec())
+			})
+			.transpose()
 	}
 
 	pub fn get_method(&self) -> &HttpMethod {
@@ -103,7 +118,10 @@ impl Request {
 			}
 		}
 		let size_hint = self.hyper_request.body().size_hint();
-		size_hint.upper().unwrap_or_else(|| size_hint.lower()).into()
+		size_hint
+			.upper()
+			.unwrap_or_else(|| size_hint.lower())
+			.into()
 	}
 
 	pub fn get_path(&self) -> String {
@@ -122,8 +140,15 @@ impl Request {
 		))
 	}
 
-	pub fn get_query_string(&self) -> String {
-		self.hyper_request.uri().query().unwrap_or("").to_string()
+	pub fn get_query(&self) -> &str {
+		self.hyper_request.uri().query().unwrap_or("")
+	}
+
+	pub fn get_query_as<Q>(&self) -> Result<Q, EveError>
+	where
+		Q: DeserializeOwned,
+	{
+		serde_qs::from_str(self.get_query()).map_err(EveError::QueryStringParse)
 	}
 
 	pub fn get_host(&self) -> String {
@@ -132,7 +157,8 @@ impl Request {
 			.host()
 			.map(String::from)
 			.unwrap_or_else(|| {
-				self.get_header("host").unwrap_or_else(|| "".to_string())
+				self.get_header(HeaderName::from_static("host"))
+					.unwrap_or_else(|| "".to_string())
 			})
 	}
 
@@ -150,19 +176,21 @@ impl Request {
 
 	pub fn get_content_type(&self) -> String {
 		let c_type = self
-			.get_header("Content-Type")
-			.unwrap_or_else(|| "text/plain".to_string());
+			.get_header(HeaderName::from_static("content-type"))
+			.unwrap_or_else(|| "unknown".to_string());
 		c_type.split(';').next().unwrap_or("").to_string()
 	}
 
 	pub fn get_charset(&self) -> Option<String> {
-		let header = self.get_header("Content-Type")?;
+		let header =
+			self.get_header(HeaderName::from_static("content-type"))?;
 		let charset_index = header.find("charset=")?;
 		let data = &header[charset_index..];
 		Some(
-			data[(charset_index + 8)..
-				data.find(';').unwrap_or_else(|| data.len())]
-				.to_string(),
+			data.chars()
+				.skip(charset_index + 8)
+				.take(data.find(';').unwrap_or_else(|| data.len()))
+				.collect(),
 		)
 	}
 
@@ -171,7 +199,9 @@ impl Request {
 		self.hyper_request
 			.uri()
 			.scheme_str()
-			.or(self.get_header("X-Forwarded-Proto").as_deref())
+			.or(self
+				.get_header(HeaderName::from_static("x-forwarded-proto"))
+				.as_deref())
 			.unwrap_or("http")
 			.to_string()
 	}
@@ -192,7 +222,7 @@ impl Request {
 	// TODO content negotiation
 	// See: https://koajs.com/#request content negotiation
 
-	pub fn get_version(&self) -> String {
+	pub fn get_version(&self) -> &str {
 		match self.hyper_request.version() {
 			Version::HTTP_09 => "0.9",
 			Version::HTTP_10 => "1.0",
@@ -201,7 +231,6 @@ impl Request {
 			Version::HTTP_3 => "3.0",
 			_ => "0.0",
 		}
-		.to_string()
 	}
 
 	pub fn get_version_major(&self) -> u8 {
@@ -223,12 +252,12 @@ impl Request {
 		}
 	}
 
-	pub fn get_header(&self, field: &str) -> Option<String> {
+	pub fn get_header(&self, field: HeaderName) -> Option<String> {
 		self.hyper_request
 			.headers()
 			.iter()
 			.find_map(|(key, value)| {
-				if key.as_str().to_lowercase() == field.to_lowercase() {
+				if key == field {
 					value.to_str().map(String::from).ok()
 				} else {
 					None

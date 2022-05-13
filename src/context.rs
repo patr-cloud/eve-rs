@@ -1,11 +1,13 @@
 use std::net::IpAddr;
 
+use hyper::header::HeaderName;
 use serde::Serialize;
 use serde_json::Value;
 
 use crate::{
-	request::{Request, RequestError},
-	response::{Response, ResponseError},
+	error::EveError,
+	request::Request,
+	response::Response,
 	HttpMethod,
 };
 
@@ -16,14 +18,11 @@ pub trait Context {
 	fn get_response(&self) -> &Response;
 	fn get_response_mut(&mut self) -> &mut Response;
 
-	async fn get_body(&mut self) -> Result<String, RequestError> {
+	async fn get_body(&mut self) -> Result<String, EveError> {
 		let request = self.get_request_mut();
 		request.get_body().await
 	}
-	async fn json<TBody>(
-		&mut self,
-		body: TBody,
-	) -> Result<&mut Self, ResponseError>
+	async fn json<TBody>(&mut self, body: TBody) -> Result<&mut Self, EveError>
 	where
 		TBody: Serialize + Send + Sync,
 	{
@@ -34,14 +33,14 @@ pub trait Context {
 			)
 			.await
 	}
-	async fn body(&mut self, string: &str) -> Result<&mut Self, ResponseError> {
+	async fn body(&mut self, string: &str) -> Result<&mut Self, EveError> {
 		self.get_response_mut().set_body(string).await?;
 		Ok(self)
 	}
 	async fn body_bytes(
 		&mut self,
 		bytes: &[u8],
-	) -> Result<&mut Self, ResponseError> {
+	) -> Result<&mut Self, EveError> {
 		self.get_response_mut().set_body_bytes(bytes).await?;
 		Ok(self)
 	}
@@ -56,7 +55,7 @@ pub trait Context {
 	fn get_status_message(&self) -> &str {
 		self.get_response().get_status_message()
 	}
-	fn status(&mut self, code: u16) -> Result<&mut Self, ResponseError> {
+	fn status(&mut self, code: u16) -> Result<&mut Self, EveError> {
 		self.get_response_mut().set_status(code)?;
 		Ok(self)
 	}
@@ -64,23 +63,17 @@ pub trait Context {
 	fn content_type(
 		&mut self,
 		content_type: &str,
-	) -> Result<&mut Self, ResponseError> {
+	) -> Result<&mut Self, EveError> {
 		self.get_response_mut().set_content_type(content_type)?;
 		Ok(self)
 	}
 
-	fn content_length(
-		&mut self,
-		length: usize,
-	) -> Result<&mut Self, ResponseError> {
+	fn content_length(&mut self, length: usize) -> Result<&mut Self, EveError> {
 		self.get_response_mut().set_content_length(length)?;
 		Ok(self)
 	}
 
-	fn redirect(
-		&mut self,
-		destination: &str,
-	) -> Result<&mut Self, ResponseError> {
+	fn redirect(&mut self, destination: &str) -> Result<&mut Self, EveError> {
 		self.get_response_mut().redirect(destination)?;
 		Ok(self)
 	}
@@ -88,7 +81,7 @@ pub trait Context {
 	fn attachment(
 		&mut self,
 		file_name: Option<&str>,
-	) -> Result<&mut Self, ResponseError> {
+	) -> Result<&mut Self, EveError> {
 		self.get_response_mut().attachment(file_name)?;
 		Ok(self)
 	}
@@ -105,8 +98,8 @@ pub trait Context {
 		self.get_request().get_origin()
 	}
 
-	fn get_query_string(&self) -> String {
-		self.get_request().get_query_string()
+	fn get_query_string(&self) -> &str {
+		self.get_request().get_query()
 	}
 
 	fn get_host(&self) -> String {
@@ -144,18 +137,18 @@ pub trait Context {
 	// TODO content negotiation
 	// See: https://koajs.com/#request content negotiation
 
-	fn get_header(&self, key: &str) -> Option<String> {
-		self.get_request().get_header(key)
+	fn get_header(&self, key: impl Into<HeaderName>) -> Option<String> {
+		self.get_request().get_header(key.into())
 	}
 	fn header(
 		&mut self,
 		key: &str,
 		value: &str,
-	) -> Result<&mut Self, ResponseError> {
+	) -> Result<&mut Self, EveError> {
 		self.get_response_mut().set_header(key, value)?;
 		Ok(self)
 	}
-	fn remove_header(&mut self, key: &str) -> Result<&mut Self, ResponseError> {
+	fn remove_header(&mut self, key: &str) -> Result<&mut Self, EveError> {
 		self.get_response_mut().remove_header(key)?;
 		Ok(self)
 	}
@@ -167,7 +160,7 @@ pub trait Context {
 	// fn get_cookies(&self) -> &Vec<Cookie> {
 	// 	self.get_request().get_cookies()
 	// }
-	// fn cookie(&mut self, cookie: Cookie) -> Result<&mut Self, ResponseError>
+	// fn cookie(&mut self, cookie: Cookie) -> Result<&mut Self, EveError>
 	// { 	self.get_response_mut().set_cookie(cookie);
 	// 	self
 	// }
@@ -175,12 +168,12 @@ pub trait Context {
 	fn last_modified(
 		&mut self,
 		last_modified: &str,
-	) -> Result<&mut Self, ResponseError> {
+	) -> Result<&mut Self, EveError> {
 		self.get_response_mut().set_last_modified(last_modified)?;
 		Ok(self)
 	}
 
-	fn etag(&mut self, etag: &str) -> Result<&mut Self, ResponseError> {
+	fn etag(&mut self, etag: &str) -> Result<&mut Self, EveError> {
 		self.get_response_mut().set_etag(etag)?;
 		Ok(self)
 	}

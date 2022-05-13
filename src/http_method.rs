@@ -6,7 +6,7 @@ use std::{
 
 use hyper::Method;
 
-use crate::request::RequestError;
+use crate::error::EveError;
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub enum HttpMethod {
@@ -42,9 +42,9 @@ impl Display for HttpMethod {
 }
 
 impl FromStr for HttpMethod {
-	type Err = String;
+	type Err = EveError;
 
-	fn from_str(method: &str) -> Result<Self, String> {
+	fn from_str(method: &str) -> Result<Self, Self::Err> {
 		match method.to_lowercase().as_ref() {
 			"get" => Ok(HttpMethod::Get),
 			"post" => Ok(HttpMethod::Post),
@@ -55,16 +55,13 @@ impl FromStr for HttpMethod {
 			"connect" => Ok(HttpMethod::Connect),
 			"patch" => Ok(HttpMethod::Patch),
 			"trace" => Ok(HttpMethod::Trace),
-			_ => Err(format!(
-				"Could not parse a suitable HTTP Method for string: '{}'",
-				method
-			)),
+			_ => Err(EveError::UnknownHttpMethod(method.to_string())),
 		}
 	}
 }
 
 impl TryFrom<&Method> for HttpMethod {
-	type Error = RequestError;
+	type Error = EveError;
 
 	fn try_from(method: &Method) -> Result<Self, Self::Error> {
 		match method {
@@ -82,7 +79,7 @@ impl TryFrom<&Method> for HttpMethod {
 					"Unable to parse {} as an http method. Ignoring...",
 					method
 				);
-				Err(RequestError::UnknownMethod(method.to_string()))
+				Err(EveError::UnknownHttpMethod(method.to_string()))
 			}
 		}
 	}

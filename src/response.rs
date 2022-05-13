@@ -12,6 +12,8 @@ use hyper::{
 };
 use tokio::sync::mpsc::UnboundedSender as MpscSender;
 
+use crate::error::EveError;
+
 #[derive(Debug)]
 pub(crate) enum PreBodySenderData {
 	Status(u16),
@@ -27,22 +29,6 @@ pub(crate) enum ResponseState {
 	},
 	PostBody {
 		body_sender: HyperSender,
-	},
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum ResponseError {
-	#[error("status cannot be set after body as been sent")]
-	StatusAfterBody,
-	#[error("headers cannot be set after body as been sent")]
-	HeaderAfterBody,
-	#[error("invalid name `{0}`. Please try to keep your header names to lowercase ASCII characters")]
-	InvalidHeaderName(String),
-	#[error("invalid value for header name `{0}`. Please try to keep your headers to printable ASCII characters")]
-	InvalidHeaderValue(String),
-	#[error("an unknown error occured")]
-	UnknownError {
-		inner: Option<Box<dyn std::error::Error + Send + Sync>>,
 	},
 }
 
@@ -127,17 +113,15 @@ impl Response {
 			_ => "unknown",
 		}
 	}
-	pub fn set_status(&mut self, code: u16) -> Result<(), ResponseError> {
+	pub fn set_status(&mut self, code: u16) -> Result<(), EveError> {
 		if let ResponseState::PreBody { header_sender } =
 			&mut self.response_state
 		{
 			header_sender
 				.send(PreBodySenderData::Status(code))
-				.map_err(|err| ResponseError::UnknownError {
-					inner: Some(Box::new(err)),
-				})?;
+				.map_err(|err| EveError::ServerError(Box::new(err)))?;
 		} else {
-			return Err(ResponseError::StatusAfterBody);
+			return Err(EveError::StatusSetAfterBody);
 		}
 		self.status = code;
 		Ok(())
@@ -146,7 +130,7 @@ impl Response {
 	pub fn set_content_length(
 		&mut self,
 		length: usize,
-	) -> Result<(), ResponseError> {
+	) -> Result<(), EveError> {
 		self.set_header("content-length", &format!("{}", length))
 	}
 
@@ -161,56 +145,50 @@ impl Response {
 		&mut self,
 		key: &str,
 		value: &str,
-	) -> Result<(), ResponseError> {
+	) -> Result<(), EveError> {
 		if let ResponseState::PreBody { header_sender } =
 			&mut self.response_state
 		{
 			header_sender
 				.send(PreBodySenderData::SetHeader(
 					HeaderName::try_from(key).map_err(|_| {
-						ResponseError::InvalidHeaderName(key.to_string())
+						EveError::InvalidResponseHeaderName(key.to_string())
 					})?,
 					HeaderValue::from_str(value).map_err(|_| {
-						ResponseError::InvalidHeaderValue(key.to_string())
+						EveError::InvalidResponseHeaderValue(key.to_string())
 					})?,
 				))
-				.map_err(|err| ResponseError::UnknownError {
-					inner: Some(Box::new(err)),
-				})?;
+				.map_err(|err| EveError::ServerError(Box::new(err)))?;
 		} else {
-			return Err(ResponseError::HeaderAfterBody);
+			return Err(EveError::HeaderSetAfterBody);
 		}
 		Ok(())
 	}
-	pub fn remove_header(&mut self, key: &str) -> Result<(), ResponseError> {
+	pub fn remove_header(&mut self, key: &str) -> Result<(), EveError> {
 		if let ResponseState::PreBody { header_sender } =
 			&mut self.response_state
 		{
 			header_sender
 				.send(PreBodySenderData::RemoveHeader(
 					HeaderName::try_from(key).map_err(|_| {
-						ResponseError::InvalidHeaderName(key.to_string())
+						EveError::InvalidResponseHeaderName(key.to_string())
 					})?,
 				))
-				.map_err(|err| ResponseError::UnknownError {
-					inner: Some(Box::new(err)),
-				})?;
+				.map_err(|err| EveError::ServerError(Box::new(err)))?;
 		} else {
-			return Err(ResponseError::HeaderAfterBody);
+			return Err(EveError::HeaderSetAfterBody);
 		}
 		Ok(())
 	}
-	pub async fn clear_headers(&mut self) -> Result<(), ResponseError> {
+	pub async fn clear_headers(&mut self) -> Result<(), EveError> {
 		if let ResponseState::PreBody { header_sender } =
 			&mut self.response_state
 		{
 			header_sender
 				.send(PreBodySenderData::ClearHeaders)
-				.map_err(|err| ResponseError::UnknownError {
-					inner: Some(Box::new(err)),
-				})?;
+				.map_err(|err| EveError::ServerError(Box::new(err)))?;
 		} else {
-			return Err(ResponseError::HeaderAfterBody);
+			return Err(EveError::HeaderSetAfterBody);
 		}
 		Ok(())
 	}
@@ -224,11 +202,11 @@ impl Response {
 	pub fn set_content_type(
 		&mut self,
 		content_type: &str,
-	) -> Result<(), ResponseError> {
+	) -> Result<(), EveError> {
 		self.set_header("Content-Type", content_type)
 	}
 
-	pub fn redirect(&mut self, url: &str) -> Result<(), ResponseError> {
+	pub fn redirect(&mut self, url: &str) -> Result<(), EveError> {
 		self.set_status(302)?;
 		self.set_header("Location", url)
 	}
@@ -236,7 +214,7 @@ impl Response {
 	pub fn attachment(
 		&mut self,
 		file_name: Option<&str>,
-	) -> Result<(), ResponseError> {
+	) -> Result<(), EveError> {
 		self.set_header(
 			"Content-Disposition",
 			&format!(
@@ -256,50 +234,43 @@ impl Response {
 	pub fn set_last_modified(
 		&mut self,
 		last_modified: &str,
-	) -> Result<(), ResponseError> {
+	) -> Result<(), EveError> {
 		self.set_header("Last-Modified", last_modified)
 	}
 
-	pub fn set_etag(&mut self, etag: &str) -> Result<(), ResponseError> {
+	pub fn set_etag(&mut self, etag: &str) -> Result<(), EveError> {
 		self.set_header("ETag", etag)
 	}
 
-	pub async fn set_body(&mut self, data: &str) -> Result<(), ResponseError> {
+	pub async fn set_body(&mut self, data: &str) -> Result<(), EveError> {
 		self.set_body_bytes(data.as_bytes()).await
 	}
 	pub async fn set_body_bytes(
 		&mut self,
 		data: &[u8],
-	) -> Result<(), ResponseError> {
+	) -> Result<(), EveError> {
 		self.set_content_length(data.len())?;
 		self.set_header("date", &Local::now().to_rfc2822())?;
 
 		self.append_body_bytes(data).await
 	}
-	pub async fn append_body(
-		&mut self,
-		data: &str,
-	) -> Result<(), ResponseError> {
+	pub async fn append_body(&mut self, data: &str) -> Result<(), EveError> {
 		self.append_body_bytes(data.as_bytes()).await
 	}
 	pub async fn append_body_bytes(
 		&mut self,
 		data: &[u8],
-	) -> Result<(), ResponseError> {
+	) -> Result<(), EveError> {
 		match &mut self.response_state {
 			ResponseState::PreBody { header_sender } => {
 				let (mut sender, body) = Body::channel();
-				header_sender.send(PreBodySenderData::Body(body)).map_err(
-					|err| ResponseError::UnknownError {
-						inner: Some(Box::new(err)),
-					},
-				)?;
+				header_sender
+					.send(PreBodySenderData::Body(body))
+					.map_err(|err| EveError::ServerError(Box::new(err)))?;
 				sender
 					.send_data(Bytes::copy_from_slice(data))
 					.await
-					.map_err(|err| ResponseError::UnknownError {
-						inner: Some(Box::new(err)),
-					})?;
+					.map_err(|err| EveError::ServerError(Box::new(err)))?;
 				self.response_state = ResponseState::PostBody {
 					body_sender: sender,
 				};
@@ -308,9 +279,7 @@ impl Response {
 				body_sender
 					.send_data(Bytes::copy_from_slice(data))
 					.await
-					.map_err(|err| ResponseError::UnknownError {
-						inner: Some(Box::new(err)),
-					})?;
+					.map_err(|err| EveError::ServerError(Box::new(err)))?;
 			}
 		}
 		Ok(())

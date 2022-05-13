@@ -5,39 +5,36 @@ use crate::{
 	error::{DefaultError, Error},
 };
 
-pub type NextHandler<TContext, TErrorData> = Box<
+pub type NextHandler<TContext, TError> = Box<
 	dyn Fn(
 			TContext,
-		) -> Pin<
-			Box<
-				dyn Future<Output = Result<TContext, Error<TErrorData>>> + Send,
-			>,
-		> + Send
+		) -> Pin<Box<dyn Future<Output = Result<TContext, TError>> + Send>>
+		+ Send
 		+ Sync,
 >;
 
 #[async_trait::async_trait]
-pub trait Middleware<TContext, TErrorData>
+pub trait Middleware<TContext, TError>
 where
 	TContext: Context + Debug + Send + Sync,
-	TErrorData: Default + Send + Sync,
+	TError: Error + Send + Sync,
 {
 	async fn run_middleware(
 		&self,
 		context: TContext,
-		next: NextHandler<TContext, TErrorData>,
-	) -> Result<TContext, Error<TErrorData>>;
+		next: NextHandler<TContext, TError>,
+	) -> Result<TContext, TError>;
 }
 
 type DefaultMiddlewareHandler = fn(
 	DefaultContext,
-	NextHandler<DefaultContext, ()>,
+	NextHandler<DefaultContext, DefaultError>,
 ) -> Pin<
 	Box<dyn Future<Output = Result<DefaultContext, DefaultError>> + Send>,
 >;
 
 #[derive(Clone)]
-pub struct DefaultMiddleware<TData>
+pub struct DefaultMiddleware<TData = ()>
 where
 	TData: Default + Clone + Send + Sync,
 {
@@ -70,14 +67,15 @@ where
 }
 
 #[async_trait::async_trait]
-impl<TData> Middleware<DefaultContext, ()> for DefaultMiddleware<TData>
+impl<TData> Middleware<DefaultContext, DefaultError>
+	for DefaultMiddleware<TData>
 where
 	TData: Default + Clone + Send + Sync,
 {
 	async fn run_middleware(
 		&self,
 		context: DefaultContext,
-		next: NextHandler<DefaultContext, ()>,
+		next: NextHandler<DefaultContext, DefaultError>,
 	) -> Result<DefaultContext, DefaultError> {
 		(self.handler)(context, next).await
 	}

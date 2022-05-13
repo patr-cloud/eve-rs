@@ -46,20 +46,19 @@ pub async fn listen<
 	TContext,
 	TMiddleware,
 	TState,
-	TErrorData,
+	TError,
 	TShutdownSignal,
 	TListenAddr,
 >(
-	app: App<TContext, TMiddleware, TState, TErrorData>,
+	app: App<TContext, TMiddleware, TState, TError>,
 	bind_addr: TListenAddr,
 	shutdown_signal: Option<TShutdownSignal>,
 ) where
 	TContext: 'static + Context + Debug + Send + Sync,
-	TMiddleware:
-		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext, TError> + Clone + Send + Sync,
 	TState: 'static + Send + Sync,
 	TShutdownSignal: Future<Output = ()>,
-	TErrorData: 'static + Default + Send + Sync,
+	TError: 'static + Error + Send + Sync,
 	TListenAddr: Into<SocketAddr>,
 {
 	let app_arc = Arc::new(app);

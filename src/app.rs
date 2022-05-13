@@ -12,24 +12,26 @@ use crate::{
 	http_method::HttpMethod,
 	middleware::Middleware,
 	middleware_handler::MiddlewareHandler,
+	DefaultContext,
+	DefaultError,
+	DefaultMiddleware,
 	Request,
 	Response,
 };
 
-type ContextGeneratorFn<TContext, TState> =
+type ContextGeneratorFn<TContext = DefaultContext, TState = ()> =
 	fn(Request, Response, &TState) -> TContext;
-type ErrorHandlerFn<TErrorData> = fn(Response, Error<TErrorData>);
+type ErrorHandlerFn<TError> = fn(Response, TError);
 
-fn chained_run<TContext, TMiddleware, TErrorData>(
+fn chained_run<TContext, TMiddleware, TError>(
 	mut context: TContext,
-	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>>,
+	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware, TError>>>,
 	i: usize,
-) -> Pin<Box<dyn Future<Output = Result<TContext, Error<TErrorData>>> + Send>>
+) -> Pin<Box<dyn Future<Output = Result<TContext, TError>> + Send>>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
-	TMiddleware:
-		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
-	TErrorData: 'static + Default + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext, TError> + Clone + Send + Sync,
+	TError: 'static + Error + Send + Sync,
 {
 	Box::pin(async move {
 		if let Some(m) = nodes.clone().get(i) {
@@ -64,43 +66,48 @@ where
 				context.get_request().hyper_request.method().to_string();
 			let path = context.get_path();
 			context
-				.status(404)?
+				.status(404)
+				.map_err(TError::from_error)?
 				.body(&format!("Cannot {} route {}", method, path))
-				.await?;
+				.await
+				.map_err(TError::from_error)?;
 			Ok(context)
 		}
 	})
 }
 
-pub struct App<TContext, TMiddleware, TState, TErrorData>
-where
+pub struct App<
+	TContext = DefaultContext,
+	TMiddleware = DefaultMiddleware,
+	TState = (),
+	TError = DefaultError,
+> where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
-	TErrorData: Default + Send + Sync,
+	TMiddleware: Middleware<TContext, TError> + Clone + Send + Sync,
+	TError: Error + Send + Sync,
 	TState: Send + Sync,
 {
 	context_generator: ContextGeneratorFn<TContext, TState>,
 	state: TState,
-	pub(crate) error_handler: Option<ErrorHandlerFn<TErrorData>>,
+	pub(crate) error_handler: Option<ErrorHandlerFn<TError>>,
 
-	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
-	post_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
-	put_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
-	delete_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
-	head_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
-	options_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
-	connect_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
-	patch_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
-	trace_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TError>>,
+	post_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TError>>,
+	put_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TError>>,
+	delete_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TError>>,
+	head_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TError>>,
+	options_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TError>>,
+	connect_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TError>>,
+	patch_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TError>>,
+	trace_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TError>>,
 }
 
-impl<TContext, TMiddleware, TState, TErrorData>
-	App<TContext, TMiddleware, TState, TErrorData>
+impl<TContext, TMiddleware, TState, TError>
+	App<TContext, TMiddleware, TState, TError>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
-	TMiddleware:
-		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
-	TErrorData: 'static + Default + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext, TError> + Clone + Send + Sync,
+	TError: 'static + Error + Send + Sync,
 	TState: Send + Sync,
 {
 	pub fn create(
@@ -128,10 +135,7 @@ where
 		&self.state
 	}
 
-	pub fn set_error_handler(
-		&mut self,
-		error_handler: ErrorHandlerFn<TErrorData>,
-	) {
+	pub fn set_error_handler(&mut self, error_handler: ErrorHandlerFn<TError>) {
 		self.error_handler = Some(error_handler);
 	}
 
@@ -139,15 +143,12 @@ where
 		self.error_handler = None;
 	}
 
-	pub fn get<IntoMiddleware, const MIDDLEWARE_LENGTH: usize>(
+	pub fn get<const MIDDLEWARE_LENGTH: usize>(
 		&mut self,
 		path: &str,
-		middlewares: [IntoMiddleware; MIDDLEWARE_LENGTH],
-	) where
-		IntoMiddleware: Into<TMiddleware>,
-	{
+		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
+	) {
 		IntoIterator::into_iter(middlewares).for_each(|handler| {
-			let handler = handler.into();
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
 				handler.clone(),
@@ -343,7 +344,7 @@ where
 	pub fn use_sub_app<TSubAppState>(
 		&mut self,
 		base_path: &str,
-		sub_app: App<TContext, TMiddleware, TSubAppState, TErrorData>,
+		sub_app: App<TContext, TMiddleware, TSubAppState, TError>,
 	) where
 		TSubAppState: Send + Sync,
 	{
@@ -451,10 +452,7 @@ where
 		));
 	}
 
-	pub async fn resolve(
-		&self,
-		context: TContext,
-	) -> Result<TContext, Error<TErrorData>> {
+	pub async fn resolve(&self, context: TContext) -> Result<TContext, TError> {
 		let method = context.get_method();
 		let stack = self.get_middleware_stack(method, context.get_path());
 		chained_run(context, Arc::new(stack), 0).await
@@ -472,7 +470,7 @@ where
 		&self,
 		method: &HttpMethod,
 		path: String,
-	) -> Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>> {
+	) -> Vec<MiddlewareHandler<TContext, TMiddleware, TError>> {
 		let mut stack = vec![];
 		let route_stack = match method {
 			HttpMethod::Get => &self.get_stack,
@@ -494,13 +492,12 @@ where
 	}
 }
 
-impl<TContext, TMiddleware, TState, TErrorData> Default
-	for App<TContext, TMiddleware, TState, TErrorData>
+impl<TContext, TMiddleware, TState, TError> Default
+	for App<TContext, TMiddleware, TState, TError>
 where
 	TContext: 'static + Context + Default + Debug + Send + Sync,
-	TMiddleware:
-		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
-	TErrorData: 'static + Default + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext, TError> + Clone + Send + Sync,
+	TError: 'static + Error + Send + Sync,
 	TState: Default + Send + Sync,
 {
 	fn default() -> Self {
@@ -508,13 +505,12 @@ where
 	}
 }
 
-impl<TContext, TMiddleware, TState, TErrorData> Clone
-	for App<TContext, TMiddleware, TState, TErrorData>
+impl<TContext, TMiddleware, TState, TError> Clone
+	for App<TContext, TMiddleware, TState, TError>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
-	TMiddleware:
-		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
-	TErrorData: 'static + Default + Send + Sync,
+	TMiddleware: 'static + Middleware<TContext, TError> + Clone + Send + Sync,
+	TError: 'static + Error + Send + Sync,
 	TState: Clone + Send + Sync,
 {
 	fn clone(&self) -> Self {

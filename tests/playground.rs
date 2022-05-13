@@ -1,16 +1,23 @@
 use std::time::Duration;
 
-use eve_rs::{App, Context, DefaultContext, DefaultMiddleware};
+use eve_rs::{App, Context, DefaultMiddleware};
+
+#[derive(Debug, thiserror::Error)]
+pub enum MyError {
+	#[error("An IO error occured: {0}")]
+	IoError(#[from] std::io::Error),
+	// #[error("An error occured running a database query: {0}")]
+	// DbError(sqlx::Error),
+	#[error("Unknown error occured: {0}")]
+	Unknown(#[from] Box<dyn std::error::Error + Send + Sync>),
+}
 
 #[tokio::test]
 async fn playground() {
-	let mut app = App::<DefaultContext, DefaultMiddleware<()>, (), ()>::create(
-		eve_rs::default_context_generator,
-		(),
-	);
+	let mut app = App::create(eve_rs::default_context_generator, ());
 	app.get(
 		"/",
-		[DefaultMiddleware::new(|mut context, _| {
+		[DefaultMiddleware::<()>::new(|mut context, _| {
 			Box::pin(async move {
 				let response = context.get_response_mut();
 				response
