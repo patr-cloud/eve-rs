@@ -1,5 +1,4 @@
 use std::{
-	array::IntoIter,
 	collections::HashMap,
 	fmt::Debug,
 	future::Future,
@@ -147,7 +146,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			let handler = handler.into();
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
@@ -166,7 +165,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			self.post_stack.push(MiddlewareHandler::new(
 				path,
 				handler.into(),
@@ -182,7 +181,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			self.put_stack.push(MiddlewareHandler::new(
 				path,
 				handler.into(),
@@ -198,7 +197,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			self.delete_stack.push(MiddlewareHandler::new(
 				path,
 				handler.into(),
@@ -214,7 +213,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			self.head_stack.push(MiddlewareHandler::new(
 				path,
 				handler.into(),
@@ -230,7 +229,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			self.options_stack.push(MiddlewareHandler::new(
 				path,
 				handler.into(),
@@ -246,7 +245,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			self.connect_stack.push(MiddlewareHandler::new(
 				path,
 				handler.into(),
@@ -262,7 +261,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			self.patch_stack.push(MiddlewareHandler::new(
 				path,
 				handler.into(),
@@ -278,7 +277,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			self.trace_stack.push(MiddlewareHandler::new(
 				path,
 				handler.into(),
@@ -294,7 +293,7 @@ where
 	) where
 		IntoMiddleware: Into<TMiddleware>,
 	{
-		IntoIter::new(middlewares).for_each(|handler| {
+		IntoIterator::into_iter(middlewares).for_each(|handler| {
 			let handler = handler.into();
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
