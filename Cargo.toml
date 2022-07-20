@@ -2,37 +2,30 @@
 authors = ["Rakshith Ravi <rakshith.ravi@gmx.com>"]
 description = "A simple, intuitive, express-like HTTP library"
 documentation = "https://docs.rs/eve-rs"
-edition = "2018"
+edition = "2021"
 homepage = "https://github.com/bytesonus/eve-rs"
 license = "MIT"
 name = "eve-rs"
 repository = "https://github.com/bytesonus/eve-rs"
-version = "0.3.0"
+version = "0.4.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[features]
-cookies = []
-default = ["cookies", "render"] #, "file-uploader"]
-file-uploader = ["multer", "rust-s3"]
-render = ["handlebars"]
-
 [dependencies]
-async-trait = "0.1.36"
+async-trait = "0.1.56"
 chrono = "0.4.19"
 colored = "2.0.0"
-flate2 = "1.0.16"
-futures = "0.3.5"
+flate2 = "1.0.24"
+futures = "0.3.21"
 hyper = {version = "0.14", features = ["server", "http1", "http2", "tcp"]}
-log = "0.4.14"
-regex = "1.3.9"
-serde = "1.0.114"
-serde_json = "1.0.57"
-serde_urlencoded = "0.6.1"
+log = "0.4.17"
+regex = "1.6.0"
+serde = "1.0.139"
+serde_json = "1.0.82"
 tokio = {version = "1", features = ["full"]}
-
-handlebars = {version = "3.5.1", optional = true}
-multer = {version = "1.2.2", optional = true}
-rust-s3 = {version = "0.26.4", optional = true}
-thiserror = "1.0.25"
-serde_qs = "0.8.4"
+handlebars = {version = "4.3.3"}
+thiserror = "1.0.31"
+serde_qs = "0.10.1"
+tokio-tungstenite = "0.17.2"
+base64 = "0.13.0"
+sha1 = "0.10.1"

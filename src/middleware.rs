@@ -5,7 +5,7 @@ use crate::{
 	error::{DefaultError, Error},
 };
 
-pub type NextHandler<TContext, TError> = Box<
+pub type NextHandler<TContext = DefaultContext, TError = DefaultError> = Box<
 	dyn Fn(
 			TContext,
 		) -> Pin<Box<dyn Future<Output = Result<TContext, TError>> + Send>>

@@ -170,40 +170,39 @@ pub struct DefaultError {
 	status: Option<u16>,
 	body: Option<Vec<u8>>,
 	headers: Vec<(HeaderName, HeaderValue)>,
-	error: Option<EveError>,
+	error: EveError,
 }
 
 impl Display for DefaultError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{:#?}", self.error)
+		write!(
+			f,
+			"DefaultError: {}. Status: {}",
+			self.error,
+			self.status
+				.map(|status| status.to_string())
+				.as_deref()
+				.unwrap_or("-")
+		)
 	}
 }
-
-impl Default for DefaultError {
-	fn default() -> Self {
-		Self {
-			status: None,
-			body: None,
-			headers: vec![],
-			error: None,
-		}
-	}
-}
-
-const EMPTY_BODY: [u8; 0] = [];
 
 impl Error for DefaultError {
 	fn from_msg(message: impl Into<String>) -> Self {
 		Self {
-			error: Some(EveError::UnknownError(message.into())),
-			..Default::default()
+			error: EveError::UnknownError(message.into()),
+			status: None,
+			body: None,
+			headers: vec![],
 		}
 	}
 
 	fn from_error<E: 'static + StdError + Send + Sync>(error: E) -> Self {
 		Self {
-			error: Some(EveError::ServerError(Box::new(error))),
-			..Default::default()
+			error: EveError::ServerError(Box::new(error)),
+			status: None,
+			body: None,
+			headers: vec![],
 		}
 	}
 
@@ -231,7 +230,7 @@ impl Error for DefaultError {
 	}
 
 	fn body_bytes(&self) -> &[u8] {
-		self.body.as_deref().unwrap_or(&EMPTY_BODY)
+		self.body.as_deref().unwrap_or(&[])
 	}
 
 	fn headers(&self) -> &[(HeaderName, HeaderValue)] {
