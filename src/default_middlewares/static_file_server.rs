@@ -21,14 +21,14 @@ impl StaticFileServer {
 		StaticFileServer { folder_path }
 	}
 
-	pub async fn serve<TContext, TErrorData>(
+	pub async fn serve<TContext, TError>(
 		&self,
 		mut context: TContext,
-		next: NextHandler<TContext, TErrorData>,
-	) -> Result<TContext, Error<TErrorData>>
+		next: NextHandler<TContext, TError>,
+	) -> Result<TContext, TError>
 	where
 		TContext: Context + Debug + Send + Sync,
-		TErrorData: Default + Send + Sync,
+		TError: Error + Send + Sync,
 	{
 		let file_location =
 			format!("{}{}", self.folder_path, context.get_path());
@@ -46,16 +46,16 @@ impl StaticFileServer {
 }
 
 #[async_trait::async_trait]
-impl<TContext, TErrorData> Middleware<TContext, TErrorData> for StaticFileServer
+impl<TContext, TError> Middleware<TContext, TError> for StaticFileServer
 where
 	TContext: 'static + Context + Debug + Send + Sync,
-	TErrorData: 'static + Default + Send + Sync,
+	TError: 'static + Error + Send + Sync,
 {
 	async fn run_middleware(
 		&self,
 		context: TContext,
-		next: NextHandler<TContext, TErrorData>,
-	) -> Result<TContext, Error<TErrorData>> {
+		next: NextHandler<TContext, TError>,
+	) -> Result<TContext, TError> {
 		self.serve(context, next).await
 	}
 }

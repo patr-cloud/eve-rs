@@ -4,12 +4,12 @@ use serde_json::Value;
 
 use crate::{AsError, Context, DefaultMiddleware, Error};
 
-pub fn parser<TContext, TErrorData>(
+pub fn parser<TContext, TError>(
 	context: &TContext,
-) -> Result<Option<Value>, Error<TErrorData>>
+) -> Result<Option<Value>, TError>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
-	TErrorData: Default + Send + Sync,
+	TError: Error + Send + Sync,
 {
 	if context.is(&["application/x-www-form-urlencoded"]) {
 		let body = context

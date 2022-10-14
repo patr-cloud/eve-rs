@@ -11,7 +11,7 @@ mod response;
 mod macros;
 mod renderer;
 
-//pub mod default_middlewares;
+// pub mod default_middlewares;
 pub mod websocket;
 
 use std::{convert::TryInto, fmt::Debug, net::SocketAddr, sync::Arc};
