@@ -76,13 +76,14 @@ where
 			.replace('+', "\\+")
 			.replace('{', "\\{")
 			.replace('}', "\\}")
-			.replace('(', "\\)")
-			.replace('(', "\\)")
+			.replace('(', "\\(")
+			.replace(')', "\\)")
 			.replace('|', "\\|")
 			.replace('^', "\\^")
 			.replace('$', "\\$")
 			.replace('.', "\\.") // Specifically, match the dot. This ain't a regex character
-			.replace("**", "(.+)") // Match anything [ NOTE: first replace `**` and then replace remaining `*` ]
+			.replace("**", "(.+)") // Match anything [ NOTE: first replace `**` and then replace
+			// remaining `*` ]
 			.replace('*', "([^/]+)"); // Match anything that's not a /, but at least 1 character
 
 		// Make a variable out of anything that begins with a : and has a-z,

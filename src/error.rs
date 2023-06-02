@@ -16,117 +16,112 @@ Requirements of error from Eve:
 
 pub trait Error: Display {
 	fn from_msg(message: impl Into<String>) -> Self;
-	fn from_error<E: 'static + StdError + Send + Sync>(error: E) -> Self;
+	fn from_error<E: StdError + Send + Sync + 'static>(error: E) -> Self;
 
-	fn status(&mut self, status: u16) -> &mut Self;
-	fn body(&mut self, body: impl Into<Vec<u8>>) -> &mut Self;
+	fn status(self, status: u16) -> Self;
+	fn body(self, body: impl Into<Vec<u8>>) -> Self;
 	fn header(
-		&mut self,
+		self,
 		key: impl Into<HeaderName>,
 		value: impl Into<HeaderValue>,
-	) -> &mut Self;
+	) -> Self;
 
 	fn status_code(&self) -> u16;
 	fn body_bytes(&self) -> &[u8];
 	fn headers(&self) -> &[(HeaderName, HeaderValue)];
 }
 
-pub trait AsError<Value, TError>
+pub trait AsErrorAble {
+	fn into_error(self) -> DefaultError;
+}
+
+impl<E: StdError + Send + Sync + 'static> AsErrorAble for E {
+	fn into_error(self) -> DefaultError {
+		DefaultError::from_error(self)
+	}
+}
+
+impl AsErrorAble for DefaultError {
+	fn into_error(self) -> DefaultError {
+		self
+	}
+}
+
+pub trait AsError<Value>
 where
 	Value: Send + Sync,
-	TError: Error,
 {
-	fn status(self, status: u16) -> Result<Value, TError>;
-	fn body_bytes(self, body: &[u8]) -> Result<Value, TError>;
-	fn body<TBody>(self, body: TBody) -> Result<Value, TError>
+	fn status(self, status: u16) -> Result<Value, DefaultError>;
+	fn body_bytes(self, body: &[u8]) -> Result<Value, DefaultError>;
+	fn body<TBody>(self, body: TBody) -> Result<Value, DefaultError>
 	where
 		TBody: AsRef<str>;
 }
 
-impl<Value, StdErr, TError> AsError<Value, TError> for Result<Value, StdErr>
+impl<Value, StdErr> AsError<Value> for Result<Value, StdErr>
 where
-	StdErr: 'static + StdError + Send + Sync,
+	StdErr: AsErrorAble,
 	Value: Send + Sync,
-	TError: Error,
 {
-	fn status(self, status: u16) -> Result<Value, TError> {
+	fn status(self, status: u16) -> Result<Value, DefaultError> {
 		match self {
 			Ok(value) => Ok(value),
-			Err(err) => {
-				let mut error = TError::from_error(err);
-				error.status(status);
-				Err(error)
-			}
+			Err(err) => Err(err.into_error().status(status)),
 		}
 	}
 
-	fn body_bytes(self, body: &[u8]) -> Result<Value, TError> {
+	fn body_bytes(self, body: &[u8]) -> Result<Value, DefaultError> {
 		match self {
 			Ok(value) => Ok(value),
-			Err(err) => {
-				let mut error = TError::from_error(err);
-				error.body(body);
-				Err(error)
-			}
+			Err(err) => Err(err.into_error().body(body)),
 		}
 	}
 
-	fn body<TBody>(self, body: TBody) -> Result<Value, TError>
+	fn body<TBody>(self, body: TBody) -> Result<Value, DefaultError>
 	where
 		TBody: AsRef<str>,
 	{
 		match self {
 			Ok(value) => Ok(value),
-			Err(err) => {
-				let mut error = TError::from_error(err);
-				error.body(body.as_ref().as_bytes());
-				Err(error)
-			}
+			Err(err) => Err(err.into_error().body(body.as_ref().as_bytes())),
 		}
 	}
 }
 
-impl<Value, TError> AsError<Value, TError> for Option<Value>
+impl<Value> AsError<Value> for Option<Value>
 where
 	Value: Send + Sync,
-	TError: Error,
 {
-	fn status(self, status: u16) -> Result<Value, TError> {
+	fn status(self, status: u16) -> Result<Value, DefaultError> {
 		match self {
 			Some(value) => Ok(value),
-			None => {
-				let mut err =
-					TError::from_msg(format!("expected Some, got None"));
-				err.status(status);
-				Err(err)
-			}
+			None => Err(DefaultError::from_msg(
+				"expected Some, got None".to_string(),
+			)
+			.status(status)),
 		}
 	}
 
-	fn body_bytes(self, body: &[u8]) -> Result<Value, TError> {
+	fn body_bytes(self, body: &[u8]) -> Result<Value, DefaultError> {
 		match self {
 			Some(value) => Ok(value),
-			None => {
-				let mut err =
-					TError::from_msg(format!("expected Some, got None"));
-				err.body(body);
-				Err(err)
-			}
+			None => Err(DefaultError::from_msg(
+				"expected Some, got None".to_string(),
+			)
+			.body(body)),
 		}
 	}
 
-	fn body<TBody>(self, body: TBody) -> Result<Value, TError>
+	fn body<TBody>(self, body: TBody) -> Result<Value, DefaultError>
 	where
 		TBody: AsRef<str>,
 	{
 		match self {
 			Some(value) => Ok(value),
-			None => {
-				let mut err =
-					TError::from_msg(format!("expected Some, got None"));
-				err.body(body.as_ref().as_bytes());
-				Err(err)
-			}
+			None => Err(DefaultError::from_msg(
+				"expected Some, got None".to_string(),
+			)
+			.body(body.as_ref().as_bytes())),
 		}
 	}
 }
@@ -166,11 +161,27 @@ pub enum EveError {
 	ServerError(Box<dyn StdError + Send + Sync>),
 }
 
+#[derive(Debug)]
 pub struct DefaultError {
 	status: Option<u16>,
 	body: Option<Vec<u8>>,
 	headers: Vec<(HeaderName, HeaderValue)>,
 	error: EveError,
+}
+
+impl DefaultError {
+	pub fn empty() -> Self {
+		Self {
+			error: EveError::UnknownError("unknown error".into()),
+			status: None,
+			body: None,
+			headers: vec![],
+		}
+	}
+
+	pub fn as_result<TSuccess>() -> Result<TSuccess, Self> {
+		Err(Self::empty())
+	}
 }
 
 impl Display for DefaultError {
@@ -206,27 +217,27 @@ impl Error for DefaultError {
 		}
 	}
 
-	fn status(&mut self, status: u16) -> &mut Self {
+	fn status(mut self, status: u16) -> Self {
 		self.status = Some(status);
 		self
 	}
 
-	fn body(&mut self, body: impl Into<Vec<u8>>) -> &mut Self {
+	fn body(mut self, body: impl Into<Vec<u8>>) -> Self {
 		self.body = Some(body.into());
 		self
 	}
 
 	fn header(
-		&mut self,
+		mut self,
 		key: impl Into<HeaderName>,
 		value: impl Into<HeaderValue>,
-	) -> &mut Self {
+	) -> Self {
 		self.headers.push((key.into(), value.into()));
 		self
 	}
 
 	fn status_code(&self) -> u16 {
-		self.status.unwrap_or(0)
+		self.status.unwrap_or(500)
 	}
 
 	fn body_bytes(&self) -> &[u8] {
@@ -235,5 +246,11 @@ impl Error for DefaultError {
 
 	fn headers(&self) -> &[(HeaderName, HeaderValue)] {
 		&self.headers
+	}
+}
+
+impl<E: StdError + Send + Sync + 'static> From<E> for DefaultError {
+	fn from(error: E) -> Self {
+		Self::from_error(error)
 	}
 }

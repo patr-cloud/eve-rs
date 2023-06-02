@@ -26,7 +26,7 @@ pub struct Request {
 }
 
 impl Request {
-	pub const MAX_REQUEST_LENGTH: usize = 10 * 1024 * 1024; // Max 10 MiB
+	pub const MAX_REQUEST_LENGTH: usize = 100 * 1024 * 1024; // Max 100 MiB
 
 	pub(crate) fn new(
 		socket_addr: SocketAddr,
@@ -75,7 +75,7 @@ impl Request {
 				break;
 			};
 			let data = data.map_err(EveError::RequestIo)?;
-			bytes.extend_from_slice(&mut data.as_ref());
+			bytes.extend_from_slice(data.as_ref());
 		}
 
 		Ok(bytes.as_slice())
@@ -110,8 +110,7 @@ impl Request {
 			.hyper_request
 			.headers()
 			.get(header::CONTENT_LENGTH)
-			.map(|value| value.to_str().ok())
-			.flatten()
+			.and_then(|value| value.to_str().ok())
 		{
 			if let Ok(value) = length.parse::<u128>() {
 				return value;
@@ -158,7 +157,7 @@ impl Request {
 			.map(String::from)
 			.unwrap_or_else(|| {
 				self.get_header(HeaderName::from_static("host"))
-					.unwrap_or_else(|| "".to_string())
+					.unwrap_or_default()
 			})
 	}
 
@@ -189,7 +188,7 @@ impl Request {
 		Some(
 			data.chars()
 				.skip(charset_index + 8)
-				.take(data.find(';').unwrap_or_else(|| data.len()))
+				.take(data.find(';').unwrap_or(data.len()))
 				.collect(),
 		)
 	}
@@ -289,11 +288,6 @@ impl Request {
 
 impl Debug for Request {
 	fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
-		write!(
-			f,
-			"[Request {} {}]",
-			self.get_method().to_string(),
-			self.get_path()
-		)
+		write!(f, "[Request {} {}]", self.get_method(), self.get_path())
 	}
 }

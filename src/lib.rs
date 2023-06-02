@@ -35,7 +35,7 @@ pub use self::{
 	app::App,
 	context::{default_context_generator, Context, DefaultContext},
 	cookie::{Cookie, CookieOptions, SameSite},
-	error::{AsError, DefaultError, Error},
+	error::{AsError, DefaultError, Error, EveError},
 	http_method::HttpMethod,
 	middleware::{DefaultMiddleware, Middleware, NextHandler},
 	renderer::RenderEngine,
@@ -112,7 +112,11 @@ pub async fn listen<
 									// error handler exists
 									if let Some(handler) = app.error_handler {
 										let response = Response::new(sender);
-										handler(response, err);
+										handler(response, err)
+											.await
+											.unwrap_or_else(|err| {
+												log::error!("Error occured running error handler: {}", err);
+											});
 									} else {
 										let _ = sender.send(
 											PreBodySenderData::Status(500),

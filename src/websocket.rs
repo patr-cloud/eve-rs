@@ -4,8 +4,10 @@ use futures::{stream::SplitSink, SinkExt, StreamExt};
 use hyper::upgrade::Upgraded;
 use sha1::{Digest, Sha1};
 use tokio::sync::Mutex;
+pub use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{
-	tungstenite::{protocol::Role, Message},
+	tungstenite::protocol::Role,
+	tungstenite::Error as TungsteniteError,
 	WebSocketStream,
 };
 
@@ -17,11 +19,20 @@ pub struct WebsocketConnection {
 }
 
 impl WebsocketConnection {
-	pub async fn send(
-		&self,
-		msg: Message,
-	) -> Result<(), tokio_tungstenite::tungstenite::Error> {
+	pub async fn send(&self, msg: Message) -> Result<(), TungsteniteError> {
 		self.writer.lock().await.send(msg).await
+	}
+
+	pub async fn ping_connected(&self) -> Result<bool, TungsteniteError> {
+		let result = self.writer.lock().await.send(Message::Ping(vec![])).await;
+		match result {
+			Ok(()) => Ok(true),
+			Err(
+				TungsteniteError::ConnectionClosed |
+				TungsteniteError::AlreadyClosed,
+			) => Ok(false),
+			Err(err) => Err(err),
+		}
 	}
 }
 

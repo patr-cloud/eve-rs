@@ -21,7 +21,11 @@ use crate::{
 
 type ContextGeneratorFn<TContext = DefaultContext, TState = ()> =
 	fn(Request, Response, &TState) -> TContext;
-type ErrorHandlerFn<TError> = fn(Response, TError);
+type ErrorHandlerFn<TError> =
+	fn(
+		Response,
+		TError,
+	) -> Pin<Box<dyn Future<Output = Result<(), TError>> + Send>>;
 
 fn chained_run<TContext, TMiddleware, TError>(
 	mut context: TContext,

@@ -137,8 +137,7 @@ impl Response {
 	pub fn get_header(&self, field: &str) -> Option<String> {
 		self.headers
 			.get(field)
-			.map(|value| value.to_str().ok())
-			.flatten()
+			.and_then(|value| value.to_str().ok())
 			.map(String::from)
 	}
 	pub fn set_header(
