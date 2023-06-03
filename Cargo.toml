@@ -2,7 +2,7 @@
 authors = ["Rakshith Ravi <rakshith.ravi@gmx.com>"]
 description = "A simple, intuitive, express-like HTTP library"
 documentation = "https://docs.rs/eve-rs"
-edition = "2018"
+edition = "2021"
 homepage = "https://github.com/bytesonus/eve-rs"
 license = "MIT"
 name = "eve-rs"

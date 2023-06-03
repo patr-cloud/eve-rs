@@ -1,5 +1,4 @@
 use std::{
-	array::IntoIter,
 	collections::HashMap,
 	fmt::Debug,
 	future::Future,
@@ -142,7 +141,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
 				handler.clone(),
@@ -158,7 +157,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.post_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -169,7 +168,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.put_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -180,7 +179,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.delete_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -191,7 +190,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.head_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -202,7 +201,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.options_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -213,7 +212,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.connect_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -224,7 +223,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.patch_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -235,7 +234,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.trace_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -246,7 +245,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
 				handler.clone(),
