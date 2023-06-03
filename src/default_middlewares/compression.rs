@@ -1,6 +1,8 @@
-use crate::{Context, DefaultMiddleware};
-use flate2::{Compress, Compression, FlushCompress, GzBuilder, Status};
 use std::{fmt::Debug, io::prelude::*};
+
+use flate2::{Compress, Compression, FlushCompress, GzBuilder, Status};
+
+use crate::{Context, DefaultMiddleware};
 
 pub const DEFAULT_COMPRESSION_LEVEL: u32 = 6;
 
@@ -25,7 +27,7 @@ impl CompressionHandler {
 		let allowed_encodings = context
 			.get_request()
 			.get_header("Accept-Encoding")
-			.unwrap_or_else(String::new);
+			.unwrap_or_default();
 		let allowed_encodings = allowed_encodings
 			.split(',')
 			.map(str::trim)
@@ -46,7 +48,7 @@ impl CompressionHandler {
 			let data = context.get_response().get_body();
 			let mut output = [];
 			if let Ok(Status::Ok) = self.zlib_compressor.compress(
-				&data,
+				data,
 				&mut output,
 				FlushCompress::None,
 			) {

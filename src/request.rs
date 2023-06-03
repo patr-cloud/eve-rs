@@ -1,11 +1,13 @@
-use crate::{cookie::Cookie, HttpMethod};
-use hyper::{body, Body, Request as HyperRequestInternal, Uri, Version};
 use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
 	net::{IpAddr, SocketAddr},
 	str::{self, Utf8Error},
 };
+
+use hyper::{body, Body, Request as HyperRequestInternal, Uri, Version};
+
+use crate::{cookie::Cookie, HttpMethod};
 
 pub type HyperRequest = HyperRequestInternal<Body>;
 
@@ -115,9 +117,10 @@ impl Request {
 	}
 
 	pub fn get_host(&self) -> String {
-		self.uri.host().map(String::from).unwrap_or_else(|| {
-			self.get_header("host").unwrap_or_else(|| "".to_string())
-		})
+		self.uri
+			.host()
+			.map(String::from)
+			.unwrap_or_else(|| self.get_header("host").unwrap_or_default())
 	}
 
 	pub fn get_host_and_port(&self) -> String {
@@ -144,8 +147,7 @@ impl Request {
 		let charset_index = header.find("charset=")?;
 		let data = &header[charset_index..];
 		Some(
-			data[(charset_index + 8)..
-				data.find(';').unwrap_or_else(|| data.len())]
+			data[(charset_index + 8)..data.find(';').unwrap_or(data.len())]
 				.to_string(),
 		)
 	}

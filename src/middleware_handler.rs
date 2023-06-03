@@ -1,23 +1,29 @@
-use crate::{Context, Middleware};
-use regex::Regex;
 use std::{fmt::Debug, marker::PhantomData};
 
-pub(crate) struct MiddlewareHandler<TContext, TMiddleware>
+use regex::Regex;
+
+use crate::{Context, Middleware};
+
+pub(crate) struct MiddlewareHandler<TContext, TMiddleware, TErrorData>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: Default + Send + Sync,
 {
 	pub(crate) is_endpoint: bool,
 	pub(crate) mounted_url: String,
 	pub(crate) path_match: Regex,
 	pub(crate) handler: TMiddleware,
-	phantom: PhantomData<TContext>,
+	phantom_context: PhantomData<TContext>,
+	phantom_error: PhantomData<TErrorData>,
 }
 
-impl<TContext, TMiddleware> Clone for MiddlewareHandler<TContext, TMiddleware>
+impl<TContext, TMiddleware, TErrorData> Clone
+	for MiddlewareHandler<TContext, TMiddleware, TErrorData>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: Default + Send + Sync,
 {
 	fn clone(&self) -> Self {
 		MiddlewareHandler {
@@ -25,15 +31,18 @@ where
 			mounted_url: self.mounted_url.clone(),
 			path_match: self.path_match.clone(),
 			handler: self.handler.clone(),
-			phantom: PhantomData,
+			phantom_context: PhantomData,
+			phantom_error: PhantomData,
 		}
 	}
 }
 
-impl<TContext, TMiddleware> MiddlewareHandler<TContext, TMiddleware>
+impl<TContext, TMiddleware, TErrorData>
+	MiddlewareHandler<TContext, TMiddleware, TErrorData>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: Default + Send + Sync,
 {
 	pub(crate) fn new(
 		path: &str,
@@ -67,29 +76,33 @@ where
 			.replace('+', "\\+")
 			.replace('{', "\\{")
 			.replace('}', "\\}")
-			.replace('(', "\\)")
-			.replace('(', "\\)")
+			.replace('(', "\\(")
+			.replace(')', "\\)")
 			.replace('|', "\\|")
 			.replace('^', "\\^")
 			.replace('$', "\\$")
 			.replace('.', "\\.") // Specifically, match the dot. This ain't a regex character
-			.replace('*', "([^\\/].)+") // Match anything that's not a /, but at least 1 character
-			.replace("**", "(.)+"); //Match anything
+			.replace("**", "(.+)") // Match anything [ NOTE: first replace `**` and then replace
+			// remaining `*` ]
+			.replace('*', "([^/]+)"); // Match anything that's not a /, but at least 1 character
 
-		// Make a variable out of anything that begins with a : and has a-z, A-Z, 0-9, '_'
+		// Make a variable out of anything that begins with a : and has a-z,
+		// A-Z, 0-9, '_'
 		regex_path = Regex::new(":(?P<var>([a-zA-Z0-9_]+))")
 			.unwrap()
-			// Match that variable with anything that has a-z, A-Z, 0-9, '_', '.' and a '-'
-			.replace_all(&regex_path, "(?P<$var>([a-zA-Z0-9_\\.-]+))")
+			// Match that variable with anything that isn't a `/`
+			.replace_all(&regex_path, "(?P<$var>([^\\s/]+))")
 			.to_string();
 
 		if regex_path != "/" {
 			// If there's something to match with,
-			// add the Regex to mention that both / and non / should match at the end of the url
+			// add the Regex to mention that both / and non / should match at
+			// the end of the url
 			regex_path.push_str("[/]?");
 		}
 
-		// If this is only supposed to match an endpoint URL, make sure the Regex only allows the end of the path
+		// If this is only supposed to match an endpoint URL, make sure the
+		// Regex only allows the end of the path
 		if is_endpoint {
 			regex_path.push('$');
 		}
@@ -99,7 +112,8 @@ where
 			mounted_url,
 			path_match: Regex::new(&regex_path).unwrap(),
 			handler,
-			phantom: PhantomData,
+			phantom_context: PhantomData,
+			phantom_error: PhantomData,
 		}
 	}
 

@@ -1,10 +1,12 @@
-use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
-
-use serde_json::Value;
 use std::{
 	net::IpAddr,
 	str::{self, Utf8Error},
 };
+
+use serde::Serialize;
+use serde_json::Value;
+
+use crate::{cookie::Cookie, request::Request, response::Response, HttpMethod};
 
 pub trait Context {
 	fn get_request(&self) -> &Request;
@@ -16,9 +18,14 @@ pub trait Context {
 	fn get_body(&self) -> Result<String, Utf8Error> {
 		self.get_request().get_body()
 	}
-	fn json(&mut self, body: Value) -> &mut Self {
-		self.content_type("application/json")
-			.body(&body.to_string())
+	fn json<TBody>(&mut self, body: TBody) -> &mut Self
+	where
+		TBody: Serialize,
+	{
+		self.content_type("application/json").body(
+			&serde_json::to_string(&body)
+				.expect("unable to serialize body into JSON"),
+		)
 	}
 	fn body(&mut self, string: &str) -> &mut Self {
 		self.get_response_mut().set_body(string);

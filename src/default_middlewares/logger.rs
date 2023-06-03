@@ -1,7 +1,9 @@
-use crate::Context;
+use std::{fmt::Debug, time::Instant};
+
 use chrono::Local;
 use colored::Colorize;
-use std::{fmt::Debug, time::Instant};
+
+use crate::Context;
 
 pub struct LoggerMiddleware<TContext>
 where
@@ -48,13 +50,12 @@ where
 		let elapsed_time =
 			Instant::now().duration_since(self.measurer.unwrap());
 
-		if (self.should_skip)(&context) {
+		if (self.should_skip)(context) {
 			return None;
 		}
 		let reqs = self
 			.log_format
 			.match_indices(":req[")
-			.into_iter()
 			.filter_map(|(index, _)| {
 				let header_end_index =
 					self.log_format[index..].chars().position(|c| c == ']')?;
@@ -62,7 +63,7 @@ where
 					&self.log_format[(index + 5)..header_end_index];
 				Some((
 					header_name.to_string(),
-					context.get_header(&header_name)?,
+					context.get_header(header_name)?,
 				))
 			})
 			.collect::<Vec<(String, String)>>();
@@ -70,7 +71,6 @@ where
 		let ress = self
 			.log_format
 			.match_indices(":res[")
-			.into_iter()
 			.filter_map(|(index, _)| {
 				let header_end_index =
 					self.log_format[index..].chars().position(|c| c == ']')?;
@@ -78,7 +78,7 @@ where
 					&self.log_format[(index + 5)..(index + header_end_index)];
 				Some((
 					header_name.to_string(),
-					context.get_response().get_header(&header_name)?,
+					context.get_response().get_header(header_name)?,
 				))
 			})
 			.collect::<Vec<(String, String)>>();
@@ -103,7 +103,7 @@ where
 			.replace(
 				":referrer",
 				&context.get_header("Referer").unwrap_or_else(|| {
-					context.get_header("Referrer").unwrap_or_else(String::new)
+					context.get_header("Referrer").unwrap_or_default()
 				}),
 			)
 			.replace(":remote-addr", &context.get_ip().to_string())
@@ -144,7 +144,7 @@ where
 			.replace(":url", &context.get_path())
 			.replace(
 				":user-agent",
-				&context.get_header("User-Agent").unwrap_or_else(String::new),
+				&context.get_header("User-Agent").unwrap_or_default(),
 			)
 			.replace(
 				":content-length",

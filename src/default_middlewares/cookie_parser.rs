@@ -1,5 +1,6 @@
-use crate::{Context, Cookie, CookieOptions, DefaultMiddleware, SameSite};
 use std::fmt::Debug;
+
+use crate::{Context, Cookie, CookieOptions, DefaultMiddleware, SameSite};
 
 pub fn parser<TContext>(context: &mut TContext)
 where

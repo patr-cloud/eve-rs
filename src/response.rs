@@ -1,9 +1,11 @@
-use crate::Cookie;
-use chrono::Local;
 use std::{
 	collections::HashMap,
 	fmt::{Debug, Formatter, Result as FmtResult},
 };
+
+use chrono::Local;
+
+use crate::Cookie;
 
 #[derive(Clone)]
 pub struct Response {

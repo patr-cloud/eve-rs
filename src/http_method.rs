@@ -1,8 +1,9 @@
-use hyper::Method;
 use std::{
 	fmt::{Display, Error, Formatter},
 	str::FromStr,
 };
+
+use hyper::Method;
 
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]
 pub enum HttpMethod {

@@ -1,10 +1,15 @@
-use crate::{AsError, Context, DefaultMiddleware, Error};
-use serde_json::Value;
 use std::fmt::Debug;
 
-pub fn parser<TContext>(context: &TContext) -> Result<Option<Value>, Error>
+use serde_json::Value;
+
+use crate::{AsError, Context, DefaultMiddleware, Error};
+
+pub fn parser<TContext, TErrorData>(
+	context: &TContext,
+) -> Result<Option<Value>, Error<TErrorData>>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
+	TErrorData: Default + Send + Sync,
 {
 	if context.is(&["application/x-www-form-urlencoded"]) {
 		let body = context

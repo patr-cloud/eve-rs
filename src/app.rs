@@ -1,3 +1,11 @@
+use std::{
+	collections::HashMap,
+	fmt::Debug,
+	future::Future,
+	pin::Pin,
+	sync::Arc,
+};
+
 use crate::{
 	context::Context,
 	error::Error,
@@ -8,27 +16,19 @@ use crate::{
 	Response,
 };
 
-use std::{
-	array::IntoIter,
-	collections::HashMap,
-	error::Error as StdError,
-	fmt::Debug,
-	future::Future,
-	pin::Pin,
-	sync::Arc,
-};
-
 type ContextGeneratorFn<TContext, TState> = fn(Request, &TState) -> TContext;
-type ErrorHandlerFn = fn(Response, Box<dyn StdError>) -> Response;
+type ErrorHandlerFn<TErrorData> = fn(Response, Error<TErrorData>) -> Response;
 
-fn chained_run<TContext, TMiddleware>(
+fn chained_run<TContext, TMiddleware, TErrorData>(
 	mut context: TContext,
-	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware>>>,
+	nodes: Arc<Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>>,
 	i: usize,
-) -> Pin<Box<dyn Future<Output = Result<TContext, Error>> + Send>>
+) -> Pin<Box<dyn Future<Output = Result<TContext, Error<TErrorData>>> + Send>>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
-	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware:
+		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: 'static + Default + Send + Sync,
 {
 	Box::pin(async move {
 		if let Some(m) = nodes.clone().get(i) {
@@ -69,31 +69,35 @@ where
 	})
 }
 
-pub struct App<TContext, TMiddleware, TState>
+pub struct App<TContext, TMiddleware, TState, TErrorData>
 where
 	TContext: Context + Debug + Send + Sync,
-	TMiddleware: Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware: Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: Default + Send + Sync,
 	TState: Send + Sync,
 {
 	context_generator: ContextGeneratorFn<TContext, TState>,
 	state: TState,
-	pub(crate) error_handler: Option<ErrorHandlerFn>,
+	pub(crate) error_handler: Option<ErrorHandlerFn<TErrorData>>,
 
-	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
-	post_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
-	put_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
-	delete_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
-	head_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
-	options_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
-	connect_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
-	patch_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
-	trace_stack: Vec<MiddlewareHandler<TContext, TMiddleware>>,
+	get_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	post_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	put_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	delete_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	head_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	options_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	connect_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	patch_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
+	trace_stack: Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>>,
 }
 
-impl<TContext, TMiddleware, TState> App<TContext, TMiddleware, TState>
+impl<TContext, TMiddleware, TState, TErrorData>
+	App<TContext, TMiddleware, TState, TErrorData>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
-	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware:
+		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: 'static + Default + Send + Sync,
 	TState: Send + Sync,
 {
 	pub fn create(
@@ -121,7 +125,10 @@ where
 		&self.state
 	}
 
-	pub fn set_error_handler(&mut self, error_handler: ErrorHandlerFn) {
+	pub fn set_error_handler(
+		&mut self,
+		error_handler: ErrorHandlerFn<TErrorData>,
+	) {
 		self.error_handler = Some(error_handler);
 	}
 
@@ -134,7 +141,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
 				handler.clone(),
@@ -150,7 +157,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.post_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -161,7 +168,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.put_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -172,7 +179,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.delete_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -183,7 +190,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.head_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -194,7 +201,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.options_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -205,7 +212,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.connect_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -216,7 +223,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.patch_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -227,7 +234,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.trace_stack
 				.push(MiddlewareHandler::new(path, handler, true));
 		});
@@ -238,7 +245,7 @@ where
 		path: &str,
 		middlewares: [TMiddleware; MIDDLEWARE_LENGTH],
 	) {
-		IntoIter::new(middlewares).for_each(|handler| {
+		middlewares.into_iter().for_each(|handler| {
 			self.get_stack.push(MiddlewareHandler::new(
 				path,
 				handler.clone(),
@@ -287,7 +294,7 @@ where
 	pub fn use_sub_app<TSubAppState>(
 		&mut self,
 		base_path: &str,
-		sub_app: App<TContext, TMiddleware, TSubAppState>,
+		sub_app: App<TContext, TMiddleware, TSubAppState, TErrorData>,
 	) where
 		TSubAppState: Send + Sync,
 	{
@@ -395,7 +402,10 @@ where
 		));
 	}
 
-	pub async fn resolve(&self, context: TContext) -> Result<TContext, Error> {
+	pub async fn resolve(
+		&self,
+		context: TContext,
+	) -> Result<TContext, Error<TErrorData>> {
 		let stack =
 			self.get_middleware_stack(context.get_method(), context.get_path());
 		chained_run(context, Arc::new(stack), 0).await
@@ -409,8 +419,8 @@ where
 		&self,
 		method: &HttpMethod,
 		path: String,
-	) -> Vec<MiddlewareHandler<TContext, TMiddleware>> {
-		let mut stack: Vec<MiddlewareHandler<TContext, TMiddleware>> = vec![];
+	) -> Vec<MiddlewareHandler<TContext, TMiddleware, TErrorData>> {
+		let mut stack = vec![];
 		let route_stack = match method {
 			HttpMethod::Get => &self.get_stack,
 			HttpMethod::Post => &self.post_stack,
@@ -431,11 +441,13 @@ where
 	}
 }
 
-impl<TContext, TMiddleware, TState> Default
-	for App<TContext, TMiddleware, TState>
+impl<TContext, TMiddleware, TState, TErrorData> Default
+	for App<TContext, TMiddleware, TState, TErrorData>
 where
 	TContext: 'static + Context + Default + Debug + Send + Sync,
-	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware:
+		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: 'static + Default + Send + Sync,
 	TState: Default + Send + Sync,
 {
 	fn default() -> Self {
@@ -443,10 +455,13 @@ where
 	}
 }
 
-impl<TContext, TMiddleware, TState> Clone for App<TContext, TMiddleware, TState>
+impl<TContext, TMiddleware, TState, TErrorData> Clone
+	for App<TContext, TMiddleware, TState, TErrorData>
 where
 	TContext: 'static + Context + Debug + Send + Sync,
-	TMiddleware: 'static + Middleware<TContext> + Clone + Send + Sync,
+	TMiddleware:
+		'static + Middleware<TContext, TErrorData> + Clone + Send + Sync,
+	TErrorData: 'static + Default + Send + Sync,
 	TState: Clone + Send + Sync,
 {
 	fn clone(&self) -> Self {
