@@ -25,8 +25,12 @@ pub use http_method::HttpMethod;
 use hyper::{
 	server::conn::AddrStream,
 	service::{make_service_fn, service_fn},
-	Body, Error as HyperError, Request as HyperRequest,
-	Response as HyperResponse, Server, StatusCode,
+	Body,
+	Error as HyperError,
+	Request as HyperRequest,
+	Response as HyperResponse,
+	Server,
+	StatusCode,
 };
 pub use middleware::{DefaultMiddleware, Middleware, NextHandler};
 pub use renderer::RenderEngine;

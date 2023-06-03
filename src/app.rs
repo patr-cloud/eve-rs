@@ -1,10 +1,18 @@
 use std::{
-	collections::HashMap, fmt::Debug, future::Future, pin::Pin, sync::Arc,
+	collections::HashMap,
+	fmt::Debug,
+	future::Future,
+	pin::Pin,
+	sync::Arc,
 };
 
 use crate::{
-	context::Context, error::Error, http_method::HttpMethod,
-	middleware::Middleware, middleware_handler::MiddlewareHandler, Request,
+	context::Context,
+	error::Error,
+	http_method::HttpMethod,
+	middleware::Middleware,
+	middleware_handler::MiddlewareHandler,
+	Request,
 	Response,
 };
 
