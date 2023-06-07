@@ -104,6 +104,9 @@ pub async fn listen<
 
 								let _ = context.header("Server", "Eve");
 
+								let _ = sender.send(
+									PreBodySenderData::Status(200),
+								);
 								// execute app's middlewares
 								let result = app.resolve(context).await;
 
@@ -129,7 +132,7 @@ pub async fn listen<
 											),
 										);
 									}
-								};
+								}
 							});
 
 							let mut status = None;
@@ -164,7 +167,7 @@ pub async fn listen<
 							}
 
 							let mut response_builder = HyperResponse::builder()
-								.status(status.unwrap_or(200));
+								.status(status.unwrap_or(404));
 							for (key, value) in headers.iter() {
 								response_builder =
 									response_builder.header(key, value);
