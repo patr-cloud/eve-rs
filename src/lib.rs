@@ -132,7 +132,7 @@ pub async fn listen<
 								};
 							});
 
-							let mut status = 404;
+							let mut status = None;
 							let mut body = Body::from(format!(
 								"Could not {} route {}",
 								method, path
@@ -142,7 +142,7 @@ pub async fn listen<
 							while let Some(data) = receiver.recv().await {
 								match data {
 									PreBodySenderData::Status(value) => {
-										status = value;
+										status = Some(value);
 									}
 									PreBodySenderData::SetHeader(
 										key,
@@ -163,8 +163,8 @@ pub async fn listen<
 								}
 							}
 
-							let mut response_builder =
-								HyperResponse::builder().status(status);
+							let mut response_builder = HyperResponse::builder()
+								.status(status.unwrap_or(200));
 							for (key, value) in headers.iter() {
 								response_builder =
 									response_builder.header(key, value);
