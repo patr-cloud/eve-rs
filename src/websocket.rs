@@ -6,8 +6,7 @@ use sha1::{Digest, Sha1};
 use tokio::sync::Mutex;
 pub use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{
-	tungstenite::protocol::Role,
-	tungstenite::Error as TungsteniteError,
+	tungstenite::{protocol::Role, Error as TungsteniteError},
 	WebSocketStream,
 };
 
@@ -36,38 +35,26 @@ impl WebsocketConnection {
 	}
 }
 
+pub type WebsocketOnConnectFn = Box<
+	dyn FnOnce(
+			WebsocketConnection,
+		) -> Pin<Box<dyn std::future::Future<Output = ()> + Send + Sync>>
+		+ Send
+		+ Sync,
+>;
+pub type WebsocketOnMessageFn = Box<
+	dyn Fn(
+			WebsocketConnection,
+			Message,
+		) -> Pin<Box<dyn std::future::Future<Output = ()> + Send + Sync>>
+		+ Send
+		+ Sync,
+>;
+
 pub struct Websocket {
-	on_connect: Option<
-		Box<
-			dyn FnOnce(
-					WebsocketConnection,
-				) -> Pin<
-					Box<dyn std::future::Future<Output = ()> + Send + Sync>,
-				> + Send
-				+ Sync,
-		>,
-	>,
-	on_disconnect: Option<
-		Box<
-			dyn FnOnce(
-					WebsocketConnection,
-				) -> Pin<
-					Box<dyn std::future::Future<Output = ()> + Send + Sync>,
-				> + Send
-				+ Sync,
-		>,
-	>,
-	on_message: Option<
-		Box<
-			dyn Fn(
-					WebsocketConnection,
-					Message,
-				) -> Pin<
-					Box<dyn std::future::Future<Output = ()> + Send + Sync>,
-				> + Send
-				+ Sync,
-		>,
-	>,
+	on_connect: Option<WebsocketOnConnectFn>,
+	on_disconnect: Option<WebsocketOnConnectFn>,
+	on_message: Option<WebsocketOnMessageFn>,
 }
 
 impl Websocket {
@@ -260,5 +247,11 @@ impl Websocket {
 			}
 			Err(err) => Err(EveError::RequestIo(err)),
 		}
+	}
+}
+
+impl Default for Websocket {
+	fn default() -> Self {
+		Self::new()
 	}
 }
